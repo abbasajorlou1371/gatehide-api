@@ -16,8 +16,8 @@ func TestUserRepository_GetByEmail(t *testing.T) {
 
 	userRepo := repositories.NewUserRepository(db)
 
-	// Create a test user
-	testUser := testutils.CreateTestUser(t, db, "test@example.com", "password123", "Test User")
+	// Create a test user with unique email
+	testUser := testutils.CreateTestUser(t, db, "test1@example.com", "password123", "Test User 1")
 
 	tests := []struct {
 		name    string
@@ -26,7 +26,7 @@ func TestUserRepository_GetByEmail(t *testing.T) {
 	}{
 		{
 			name:    "existing user",
-			email:   "test@example.com",
+			email:   "test1@example.com",
 			wantErr: false,
 		},
 		{
@@ -80,8 +80,8 @@ func TestUserRepository_UpdateLastLogin(t *testing.T) {
 
 	userRepo := repositories.NewUserRepository(db)
 
-	// Create a test user
-	testUser := testutils.CreateTestUser(t, db, "test@example.com", "password123", "Test User")
+	// Create a test user with unique email
+	testUser := testutils.CreateTestUser(t, db, "test2@example.com", "password123", "Test User 2")
 
 	tests := []struct {
 		name    string
@@ -119,8 +119,8 @@ func TestAdminRepository_GetByEmail(t *testing.T) {
 
 	adminRepo := repositories.NewAdminRepository(db)
 
-	// Create a test admin
-	testAdmin := testutils.CreateTestAdmin(t, db, "admin@example.com", "admin123", "Test Admin")
+	// Create a test admin with unique email
+	testAdmin := testutils.CreateTestAdmin(t, db, "admin4@example.com", "admin123", "Test Admin 4")
 
 	tests := []struct {
 		name    string
@@ -129,7 +129,7 @@ func TestAdminRepository_GetByEmail(t *testing.T) {
 	}{
 		{
 			name:    "existing admin",
-			email:   "admin@example.com",
+			email:   "admin4@example.com",
 			wantErr: false,
 		},
 		{
@@ -183,8 +183,8 @@ func TestAdminRepository_UpdateLastLogin(t *testing.T) {
 
 	adminRepo := repositories.NewAdminRepository(db)
 
-	// Create a test admin
-	testAdmin := testutils.CreateTestAdmin(t, db, "admin@example.com", "admin123", "Test Admin")
+	// Create a test admin with unique email
+	testAdmin := testutils.CreateTestAdmin(t, db, "admin5@example.com", "admin123", "Test Admin 5")
 
 	tests := []struct {
 		name    string
@@ -259,25 +259,25 @@ func TestAdminRepository_EmailUniqueness(t *testing.T) {
 
 	adminRepo := repositories.NewAdminRepository(db)
 
-	// Create first admin
-	testutils.CreateTestAdmin(t, db, "admin@example.com", "admin123", "First Admin")
+	// Create first admin with unique email
+	testutils.CreateTestAdmin(t, db, "admin6@example.com", "admin123", "First Admin")
 
 	// Try to create another admin with the same email
-	_, err := adminRepo.GetByEmail("admin@example.com")
+	_, err := adminRepo.GetByEmail("admin6@example.com")
 	if err != nil {
 		t.Errorf("AdminRepository.GetByEmail() failed for existing admin: %v", err)
 	}
 
 	// Create an admin with different email
-	testutils.CreateTestAdmin(t, db, "admin2@example.com", "admin123", "Second Admin")
+	testutils.CreateTestAdmin(t, db, "admin7@example.com", "admin123", "Second Admin")
 
 	// Both admins should be retrievable
-	admin1, err := adminRepo.GetByEmail("admin@example.com")
+	admin1, err := adminRepo.GetByEmail("admin6@example.com")
 	if err != nil {
 		t.Errorf("AdminRepository.GetByEmail() failed for first admin: %v", err)
 	}
 
-	admin2, err := adminRepo.GetByEmail("admin2@example.com")
+	admin2, err := adminRepo.GetByEmail("admin7@example.com")
 	if err != nil {
 		t.Errorf("AdminRepository.GetByEmail() failed for second admin: %v", err)
 	}

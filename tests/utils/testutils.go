@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/gatehide/gatehide-api/config"
 	"github.com/gatehide/gatehide-api/internal/models"
@@ -70,11 +71,42 @@ func SetupTestDB(t *testing.T) *sql.DB {
 
 // CleanupTestDB cleans up test data
 func CleanupTestDB(t *testing.T, db *sql.DB) {
-	// Clean up test data
+	// Check if database is still open
+	if err := db.Ping(); err != nil {
+		log.Printf("Warning: database connection is closed, skipping cleanup: %v", err)
+		return
+	}
+
+	// Clean up test data in reverse order to avoid foreign key constraints
 	queries := []string{
 		"DELETE FROM users",
 		"DELETE FROM admins",
 		"DELETE FROM migrations",
+	}
+
+	for _, query := range queries {
+		if _, err := db.Exec(query); err != nil {
+			log.Printf("Warning: failed to clean up test data: %v", err)
+		}
+	}
+}
+
+// CleanupTestDBForce cleans up test data and resets auto-increment
+func CleanupTestDBForce(t *testing.T, db *sql.DB) {
+	// Check if database is still open
+	if err := db.Ping(); err != nil {
+		log.Printf("Warning: database connection is closed, skipping cleanup: %v", err)
+		return
+	}
+
+	// Clean up test data and reset auto-increment
+	queries := []string{
+		"DELETE FROM users",
+		"DELETE FROM admins",
+		"DELETE FROM migrations",
+		"ALTER TABLE users AUTO_INCREMENT = 1",
+		"ALTER TABLE admins AUTO_INCREMENT = 1",
+		"ALTER TABLE migrations AUTO_INCREMENT = 1",
 	}
 
 	for _, query := range queries {
@@ -91,12 +123,15 @@ func CreateTestUser(t *testing.T, db *sql.DB, email, password, name string) *mod
 		t.Fatalf("Failed to hash password: %v", err)
 	}
 
+	// Generate unique mobile number based on email hash and timestamp
+	mobile := fmt.Sprintf("+1%09d", len(email)*1000+len(name)+int(time.Now().UnixNano()%1000000))
+
 	query := `
 		INSERT INTO users (name, mobile, email, password, image, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, NOW(), NOW())
 	`
 
-	result, err := db.Exec(query, name, "+1234567890", email, hashedPassword, nil)
+	result, err := db.Exec(query, name, mobile, email, hashedPassword, nil)
 	if err != nil {
 		t.Fatalf("Failed to create test user: %v", err)
 	}
@@ -109,7 +144,7 @@ func CreateTestUser(t *testing.T, db *sql.DB, email, password, name string) *mod
 	return &models.User{
 		ID:       int(id),
 		Name:     name,
-		Mobile:   "+1234567890",
+		Mobile:   mobile,
 		Email:    email,
 		Password: hashedPassword,
 	}
@@ -122,12 +157,15 @@ func CreateTestAdmin(t *testing.T, db *sql.DB, email, password, name string) *mo
 		t.Fatalf("Failed to hash password: %v", err)
 	}
 
+	// Generate unique mobile number based on email hash and timestamp
+	mobile := fmt.Sprintf("+1%09d", len(email)*2000+len(name)+int(time.Now().UnixNano()%1000000))
+
 	query := `
 		INSERT INTO admins (name, mobile, email, password, image, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, NOW(), NOW())
 	`
 
-	result, err := db.Exec(query, name, "+1234567890", email, hashedPassword, nil)
+	result, err := db.Exec(query, name, mobile, email, hashedPassword, nil)
 	if err != nil {
 		t.Fatalf("Failed to create test admin: %v", err)
 	}
@@ -140,7 +178,7 @@ func CreateTestAdmin(t *testing.T, db *sql.DB, email, password, name string) *mo
 	return &models.Admin{
 		ID:       int(id),
 		Name:     name,
-		Mobile:   "+1234567890",
+		Mobile:   mobile,
 		Email:    email,
 		Password: hashedPassword,
 	}
