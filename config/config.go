@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
@@ -30,7 +31,9 @@ type AppConfig struct {
 
 // SecurityConfig holds security-related configuration
 type SecurityConfig struct {
-	APISecret string
+	APISecret     string
+	JWTSecret     string
+	JWTExpiration int // in hours
 }
 
 // DatabaseConfig holds database-related configuration
@@ -61,7 +64,9 @@ func Load() *Config {
 			Version: getEnv("APP_VERSION", "1.0.0"),
 		},
 		Security: SecurityConfig{
-			APISecret: getEnv("API_SECRET", "default-secret-key"),
+			APISecret:     getEnv("API_SECRET", "default-secret-key"),
+			JWTSecret:     getEnv("JWT_SECRET", "jwt-secret-key-change-in-production"),
+			JWTExpiration: getEnvInt("JWT_EXPIRATION_HOURS", 24),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -79,6 +84,16 @@ func Load() *Config {
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+// getEnvInt retrieves an environment variable as integer or returns a default value
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
 	}
 	return defaultValue
 }

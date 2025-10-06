@@ -102,3 +102,58 @@ seed-admin: ## Seed admin user
 	@echo "👤 Seeding admin user..."
 	@go run cmd/seed/main.go -command=admin
 
+# Test commands
+test: ## Run all tests
+	@echo "🧪 Running all tests..."
+	@go test -v ./tests/...
+
+test-unit: ## Run unit tests only
+	@echo "🔬 Running unit tests..."
+	@go test -v -short ./tests/unit/...
+
+test-integration: ## Run integration tests only
+	@echo "🔗 Running integration tests..."
+	@go test -v -run "Integration" ./tests/integration/...
+
+test-auth: ## Run authentication tests only
+	@echo "🔐 Running authentication tests..."
+	@go test -v ./tests/unit -run "TestJWT\|TestUserRepository\|TestAdminRepository\|TestAuthService\|TestAuthHandler\|TestAuth"
+	@go test -v ./tests/integration -run "TestAuthentication"
+
+test-coverage: ## Run tests with coverage
+	@echo "📊 Running tests with coverage..."
+	@go test -v -coverprofile=coverage.out ./tests/...
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "✅ Coverage report generated: coverage.html"
+
+test-coverage-auth: ## Run authentication tests with coverage
+	@echo "📊 Running authentication tests with coverage..."
+	@go test -v -coverprofile=auth_coverage.out ./tests/unit/... ./tests/integration/...
+	@go tool cover -html=auth_coverage.out -o auth_coverage.html
+	@echo "✅ Authentication coverage report generated: auth_coverage.html"
+
+test-watch: ## Run tests in watch mode (requires entr)
+	@echo "👀 Running tests in watch mode..."
+	@find tests/ -name "*.go" | entr -c go test -v ./tests/...
+
+test-benchmark: ## Run benchmark tests
+	@echo "⚡ Running benchmark tests..."
+	@go test -bench=. -benchmem ./tests/...
+
+test-race: ## Run tests with race detection
+	@echo "🏁 Running tests with race detection..."
+	@go test -v -race ./tests/...
+
+test-db: ## Setup test database
+	@echo "🗄️  Setting up test database..."
+	@mysql -u root -e "CREATE DATABASE IF NOT EXISTS gatehide_test;" || echo "⚠️  Could not create test database. Make sure MySQL is running."
+
+test-db-drop: ## Drop test database
+	@echo "🗑️  Dropping test database..."
+	@mysql -u root -e "DROP DATABASE IF NOT EXISTS gatehide_test;" || echo "⚠️  Could not drop test database."
+
+test-clean: ## Clean test artifacts
+	@echo "🧹 Cleaning test artifacts..."
+	@rm -f coverage.out coverage.html auth_coverage.out auth_coverage.html
+	@echo "✅ Test artifacts cleaned"
+

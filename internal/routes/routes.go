@@ -1,28 +1,81 @@
 package routes
 
 import (
+	"database/sql"
+
 	"github.com/gatehide/gatehide-api/config"
 	"github.com/gatehide/gatehide-api/internal/handlers"
 	"github.com/gatehide/gatehide-api/internal/middlewares"
+	"github.com/gatehide/gatehide-api/internal/repositories"
+	"github.com/gatehide/gatehide-api/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
 // SetupRoutes configures all application routes
-func SetupRoutes(router *gin.Engine, cfg *config.Config) {
+func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	// Apply global middlewares
 	router.Use(middlewares.Logger())
 	router.Use(middlewares.CORS())
 	router.Use(middlewares.SecurityHeaders())
 	router.Use(gin.Recovery())
 
+	// Initialize repositories
+	userRepo := repositories.NewUserRepository(db)
+	adminRepo := repositories.NewAdminRepository(db)
+
+	// Initialize services
+	authService := services.NewAuthService(userRepo, adminRepo, cfg)
+
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(cfg)
+	authHandler := handlers.NewAuthHandler(authService)
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
-		// Health check endpoint
-		v1.GET("/health", healthHandler.Check)
+		// Public routes (no authentication required)
+		public := v1.Group("/")
+		{
+			// Health check endpoint
+			public.GET("/health", healthHandler.Check)
+
+			// Authentication routes
+			auth := public.Group("/auth")
+			{
+				// Unified login endpoint (automatically determines user type)
+				auth.POST("/login", authHandler.Login)
+				auth.POST("/refresh", authHandler.RefreshToken)
+				auth.POST("/logout", authHandler.Logout)
+			}
+		}
+
+		// Protected routes (authentication required)
+		protected := v1.Group("/")
+		protected.Use(middlewares.AuthMiddleware(authService))
+		{
+			// User profile routes (accessible by both users and admins)
+			protected.GET("/profile", authHandler.GetProfile)
+
+			// Admin-only routes
+			admin := protected.Group("/admin")
+			admin.Use(middlewares.AdminMiddleware())
+			{
+				// Add admin-specific routes here
+				admin.GET("/dashboard", func(c *gin.Context) {
+					c.JSON(200, gin.H{"message": "Admin dashboard", "user": c.GetString("user_name")})
+				})
+			}
+
+			// User-only routes
+			user := protected.Group("/user")
+			user.Use(middlewares.UserMiddleware())
+			{
+				// Add user-specific routes here
+				user.GET("/dashboard", func(c *gin.Context) {
+					c.JSON(200, gin.H{"message": "User dashboard", "user": c.GetString("user_name")})
+				})
+			}
+		}
 	}
 
 	// Root health endpoint (for load balancers)

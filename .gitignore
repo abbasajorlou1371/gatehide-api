@@ -5,6 +5,14 @@
 *.so
 *.dylib
 
+# Go compiled binaries
+gatehide-api
+gatehide-api.exe
+migrate
+migrate.exe
+seed
+seed.exe
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -56,6 +64,11 @@ temp/
 *.tmp
 *.temp
 
+# Go build artifacts
+main
+cmd/*/main
+cmd/*/*.exe
+
 # Air hot reload temporary files
 tmp/
 .air.toml.bak
@@ -63,6 +76,8 @@ tmp/
 # Coverage reports
 coverage.out
 coverage.html
+auth_coverage.out
+auth_coverage.html
 *.cover
 *.coverprofile
 
@@ -109,4 +124,26 @@ keys/
 *.bak
 *.backup
 *.old
+
+# Test configuration
+test_config.env
+test_config.local.env
+
+# Additional binary patterns
+*.bin
+*.run
+*.app
+*.deb
+*.rpm
+*.msi
+*.dmg
+*.pkg
+
+# Compiled Go files
+*.a
+*.o
+*.h
+
+# Go workspace and module files
+go.work.sum
 

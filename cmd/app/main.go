@@ -1,12 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 
 	"github.com/gatehide/gatehide-api/config"
 	"github.com/gatehide/gatehide-api/internal/routes"
 	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
@@ -16,11 +18,24 @@ func main() {
 	// Set Gin mode
 	gin.SetMode(cfg.Server.GinMode)
 
+	// Connect to database
+	db, err := sql.Open(cfg.Database.Driver, cfg.GetDSN())
+	if err != nil {
+		log.Fatalf("❌ Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	// Test database connection
+	if err := db.Ping(); err != nil {
+		log.Fatalf("❌ Failed to ping database: %v", err)
+	}
+	log.Printf("✅ Database connection established")
+
 	// Initialize Gin router
 	router := gin.New()
 
 	// Setup routes
-	routes.SetupRoutes(router, cfg)
+	routes.SetupRoutes(router, cfg, db)
 
 	// Server information
 	log.Printf("🚀 Starting %s v%s", cfg.App.Name, cfg.App.Version)
