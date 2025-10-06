@@ -16,6 +16,7 @@ type Config struct {
 	Security     SecurityConfig
 	Database     DatabaseConfig
 	Notification NotificationConfig
+	FileStorage  FileStorageConfig
 }
 
 // ServerConfig holds server-related configuration
@@ -51,6 +52,7 @@ type DatabaseConfig struct {
 // NotificationConfig holds notification-related configuration
 type NotificationConfig struct {
 	Email EmailConfig
+	SMS   SMSConfig
 }
 
 // EmailConfig holds email SMTP configuration
@@ -64,6 +66,23 @@ type EmailConfig struct {
 	FromName  string
 	UseTLS    bool
 	UseSSL    bool
+}
+
+// SMSConfig holds SMS configuration for Kavenegar
+type SMSConfig struct {
+	Enabled    bool
+	APIKey     string
+	Sender     string
+	TestMode   bool
+	MaxRetries int
+}
+
+// FileStorageConfig holds file storage configuration
+type FileStorageConfig struct {
+	UploadPath   string
+	MaxFileSize  int64 // in bytes
+	AllowedTypes []string
+	PublicURL    string
 }
 
 // Load reads configuration from environment variables
@@ -108,6 +127,19 @@ func Load() *Config {
 				UseTLS:    getEnvBool("SMTP_USE_TLS", true),
 				UseSSL:    getEnvBool("SMTP_USE_SSL", false),
 			},
+			SMS: SMSConfig{
+				Enabled:    getEnvBool("SMS_ENABLED", false),
+				APIKey:     getEnv("KAVENEGAR_API_KEY", ""),
+				Sender:     getEnv("SMS_SENDER", "10008663"),
+				TestMode:   getEnvBool("SMS_TEST_MODE", true),
+				MaxRetries: getEnvInt("SMS_MAX_RETRIES", 3),
+			},
+		},
+		FileStorage: FileStorageConfig{
+			UploadPath:   getEnv("UPLOAD_PATH", "./uploads"),
+			MaxFileSize:  getEnvInt64("MAX_FILE_SIZE", 10*1024*1024), // 10MB default
+			AllowedTypes: []string{".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx"},
+			PublicURL:    getEnv("PUBLIC_URL", "http://localhost:8080"),
 		},
 	}
 }
@@ -135,6 +167,16 @@ func getEnvBool(key string, defaultValue bool) bool {
 	if value := os.Getenv(key); value != "" {
 		if boolValue, err := strconv.ParseBool(value); err == nil {
 			return boolValue
+		}
+	}
+	return defaultValue
+}
+
+// getEnvInt64 retrieves an environment variable as int64 or returns a default value
+func getEnvInt64(key string, defaultValue int64) int64 {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.ParseInt(value, 10, 64); err == nil {
+			return intValue
 		}
 	}
 	return defaultValue

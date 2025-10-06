@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	var command = flag.String("command", "admin", "Seeder command to run (admin, notification_templates, all)")
+	var command = flag.String("command", "admin", "Seeder command to run (admin, notification_templates, gamenet, all)")
 	flag.Parse()
 
 	// Load environment variables
@@ -32,6 +32,10 @@ func main() {
 		if err := seedNotificationTemplates(cfg); err != nil {
 			log.Fatalf("Failed to seed notification templates: %v", err)
 		}
+	case "gamenet":
+		if err := seedGamenets(cfg); err != nil {
+			log.Fatalf("Failed to seed gamenets: %v", err)
+		}
 	case "all":
 		if err := seeders.RunAllSeeders(cfg); err != nil {
 			log.Fatalf("Failed to run all seeders: %v", err)
@@ -41,6 +45,7 @@ func main() {
 		fmt.Println("Available commands:")
 		fmt.Println("  admin - Seed admin user")
 		fmt.Println("  notification_templates - Seed notification templates")
+		fmt.Println("  gamenet - Seed 25 gamenets for testing")
 		fmt.Println("  all - Run all seeders")
 		os.Exit(1)
 	}
@@ -54,4 +59,9 @@ func seedAdmin(cfg *config.Config) error {
 // seedNotificationTemplates seeds the notification templates
 func seedNotificationTemplates(cfg *config.Config) error {
 	return seeders.SeedNotificationTemplates(cfg)
+}
+
+// seedGamenets seeds 25 gamenets for testing
+func seedGamenets(cfg *config.Config) error {
+	return seeders.SeedGamenets(cfg)
 }

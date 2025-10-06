@@ -8,6 +8,7 @@ import (
 	"github.com/gatehide/gatehide-api/internal/middlewares"
 	"github.com/gatehide/gatehide-api/internal/repositories"
 	"github.com/gatehide/gatehide-api/internal/services"
+	"github.com/gatehide/gatehide-api/internal/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,23 +20,33 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	router.Use(middlewares.SecurityHeaders())
 	router.Use(gin.Recovery())
 
+	// Serve uploaded files
+	router.Static("/uploads", cfg.FileStorage.UploadPath)
+
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
 	passwordResetRepo := repositories.NewPasswordResetRepository(db)
 	notificationRepo := repositories.NewMySQLNotificationRepository(db)
+	gamenetRepo := repositories.NewGamenetRepository(db)
 
 	// Initialize services
 	emailService := services.NewEmailService(&cfg.Notification.Email)
+	smsService := services.NewSMSService(&cfg.Notification.SMS)
 	notificationService := services.NewNotificationService(
-		emailService, nil, nil, nil, notificationRepo, cfg)
+		emailService, smsService, nil, nil, notificationRepo, cfg)
 	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, notificationService, cfg)
+	gamenetService := services.NewGamenetService(gamenetRepo)
+
+	// Initialize file uploader
+	fileUploader := utils.NewFileUploader(&cfg.FileStorage)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(cfg)
 	authHandler := handlers.NewAuthHandler(authService)
 	notificationHandler := handlers.NewNotificationHandler(
 		notificationService, nil, nil, authService.GetJWTManager())
+	gamenetHandler := handlers.NewGamenetHandler(gamenetService, fileUploader)
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
@@ -73,6 +84,16 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 			{
 				notifications.GET("/", notificationHandler.GetNotifications)
 				notifications.GET("/:id", notificationHandler.GetNotification)
+			}
+
+			// Gamenet routes
+			gamenets := protected.Group("/gamenets")
+			{
+				gamenets.GET("/", gamenetHandler.GetAllGamenets)
+				gamenets.POST("/", gamenetHandler.CreateGamenet)
+				gamenets.GET("/:id", gamenetHandler.GetGamenetByID)
+				gamenets.PUT("/:id", gamenetHandler.UpdateGamenet)
+				gamenets.DELETE("/:id", gamenetHandler.DeleteGamenet)
 			}
 
 			// Admin-only routes

@@ -147,3 +147,6 @@ test_config.local.env
 # Go workspace and module files
 go.work.sum
 
+# Uploaded files directory
+uploads/
+
