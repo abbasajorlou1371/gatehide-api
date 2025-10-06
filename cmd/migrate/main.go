@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gatehide/gatehide-api/config"
+	"github.com/gatehide/gatehide-api/database/seeders"
 	"github.com/gatehide/gatehide-api/internal/migrations"
 )
 
@@ -22,6 +23,7 @@ func main() {
 		command = flag.String("command", "status", "Migration command: status, up, down, create")
 		name    = flag.String("name", "", "Migration name (for create command)")
 		steps   = flag.Int("steps", 1, "Number of migrations to run (for up/down commands)")
+		seed    = flag.String("seed", "", "Run seeders after migration: 'all' or specific seeder name")
 	)
 	flag.Parse()
 
@@ -50,6 +52,12 @@ func main() {
 	case "up":
 		if err := runUp(runner, migrationsPath, *steps); err != nil {
 			log.Fatalf("Up command failed: %v", err)
+		}
+		// Run seeders after successful migration if requested
+		if *seed != "" {
+			if err := runSeeders(cfg, *seed); err != nil {
+				log.Fatalf("Seeding failed: %v", err)
+			}
 		}
 	case "down":
 		if err := runDown(runner, migrationsPath, *steps); err != nil {
@@ -315,4 +323,16 @@ func sanitizeName(name string) string {
 	}
 
 	return strings.ToLower(result.String())
+}
+
+// runSeeders executes seeders based on the seed parameter
+func runSeeders(cfg *config.Config, seedParam string) error {
+	log.Println("🌱 Running seeders...")
+
+	switch seedParam {
+	case "all":
+		return seeders.RunAllSeeders(cfg)
+	default:
+		return seeders.RunSeeder(seedParam, cfg)
+	}
 }

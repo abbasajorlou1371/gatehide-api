@@ -10,6 +10,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// init registers the admin seeder
+func init() {
+	RegisterSeeder("admin", SeedAdmin)
+}
+
 // AdminSeeder handles seeding admin data
 type AdminSeeder struct {
 	db *sql.DB
@@ -37,8 +42,27 @@ type AdminData struct {
 	Password string
 }
 
-// SeedAdmin seeds an admin user into the database
-func (s *AdminSeeder) SeedAdmin(admin AdminData) error {
+// SeedAdmin is the public seeder function that can be called by the registry
+func SeedAdmin(cfg *config.Config) error {
+	seeder, err := NewAdminSeeder(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create admin seeder: %w", err)
+	}
+	defer seeder.Close()
+
+	// Admin data to seed
+	admin := AdminData{
+		Name:     "Abbas Ajorloo",
+		Mobile:   "01907529334",
+		Email:    "abbas.ajorlou1371@gmail.com",
+		Password: "46769732",
+	}
+
+	return seeder.seedAdmin(admin)
+}
+
+// seedAdmin seeds an admin user into the database (private method)
+func (s *AdminSeeder) seedAdmin(admin AdminData) error {
 	// Hash the password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(admin.Password), bcrypt.DefaultCost)
 	if err != nil {

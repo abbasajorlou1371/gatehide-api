@@ -1,4 +1,4 @@
-.PHONY: help run build test clean install lint fmt dev hot migrate-status migrate-up migrate-down migrate-create migrate-build migrate-reset migrate-fresh seed-admin seed-build
+.PHONY: help run build test clean install lint fmt dev hot migrate-status migrate-up migrate-down migrate-create migrate-build migrate-reset migrate-fresh migrate-up-seed migrate-fresh-seed seed-admin seed-build
 
 # Variables
 BINARY_NAME=gatehide-api
@@ -82,6 +82,15 @@ migrate-fresh: ## Fresh migration (reset and run all migrations)
 	@echo "🆕 Fresh migration..."
 	@$(MAKE) migrate-reset
 	@$(MAKE) migrate-up STEPS=999
+
+migrate-up-seed: ## Run pending migrations with seeding (optionally specify seeder with SEEDER=name)
+	@echo "⬆️  Running pending migrations with seeding..."
+	@DB_AUTO_CREATE=true go run cmd/migrate/main.go -command=up -steps=$${STEPS:-999} -seed=$${SEEDER:-all}
+
+migrate-fresh-seed: ## Fresh migration with seeding (optionally specify seeder with SEEDER=name)
+	@echo "🆕 Fresh migration with seeding..."
+	@$(MAKE) migrate-reset
+	@DB_AUTO_CREATE=true go run cmd/migrate/main.go -command=up -steps=999 -seed=$${SEEDER:-all}
 
 # Seeder commands
 seed-build: ## Build seeder CLI tool

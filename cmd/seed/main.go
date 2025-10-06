@@ -38,19 +38,5 @@ func main() {
 
 // seedAdmin seeds the default admin user
 func seedAdmin(cfg *config.Config) error {
-	seeder, err := seeders.NewAdminSeeder(cfg)
-	if err != nil {
-		return fmt.Errorf("failed to create admin seeder: %w", err)
-	}
-	defer seeder.Close()
-
-	// Admin data to seed
-	admin := seeders.AdminData{
-		Name:     "Abbas Ajorloo",
-		Mobile:   "01907529334",
-		Email:    "abbas.ajorlou1371@gmail.com",
-		Password: "46769732",
-	}
-
-	return seeder.SeedAdmin(admin)
+	return seeders.SeedAdmin(cfg)
 }
