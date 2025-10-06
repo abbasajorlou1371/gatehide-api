@@ -22,13 +22,19 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
+	notificationRepo := repositories.NewMySQLNotificationRepository(db)
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, adminRepo, cfg)
+	emailService := services.NewEmailService(&cfg.Notification.Email)
+	notificationService := services.NewNotificationService(
+		emailService, nil, nil, nil, notificationRepo, cfg)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(cfg)
 	authHandler := handlers.NewAuthHandler(authService)
+	notificationHandler := handlers.NewNotificationHandler(
+		notificationService, nil, nil, authService.GetJWTManager())
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
@@ -55,6 +61,13 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 		{
 			// User profile routes (accessible by both users and admins)
 			protected.GET("/profile", authHandler.GetProfile)
+
+			// Notification routes
+			notifications := protected.Group("/notifications")
+			{
+				notifications.GET("/", notificationHandler.GetNotifications)
+				notifications.GET("/:id", notificationHandler.GetNotification)
+			}
 
 			// Admin-only routes
 			admin := protected.Group("/admin")

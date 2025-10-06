@@ -11,10 +11,11 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Server   ServerConfig
-	App      AppConfig
-	Security SecurityConfig
-	Database DatabaseConfig
+	Server       ServerConfig
+	App          AppConfig
+	Security     SecurityConfig
+	Database     DatabaseConfig
+	Notification NotificationConfig
 }
 
 // ServerConfig holds server-related configuration
@@ -47,6 +48,24 @@ type DatabaseConfig struct {
 	Driver   string
 }
 
+// NotificationConfig holds notification-related configuration
+type NotificationConfig struct {
+	Email EmailConfig
+}
+
+// EmailConfig holds email SMTP configuration
+type EmailConfig struct {
+	Enabled   bool
+	SMTPHost  string
+	SMTPPort  int
+	SMTPUser  string
+	SMTPPass  string
+	FromEmail string
+	FromName  string
+	UseTLS    bool
+	UseSSL    bool
+}
+
 // Load reads configuration from environment variables
 func Load() *Config {
 	// Load .env file if it exists
@@ -77,6 +96,19 @@ func Load() *Config {
 			SSLMode:  getEnv("DB_SSLMODE", "false"),
 			Driver:   getEnv("DB_DRIVER", "mysql"),
 		},
+		Notification: NotificationConfig{
+			Email: EmailConfig{
+				Enabled:   getEnvBool("EMAIL_ENABLED", false),
+				SMTPHost:  getEnv("SMTP_HOST", "localhost"),
+				SMTPPort:  getEnvInt("SMTP_PORT", 587),
+				SMTPUser:  getEnv("SMTP_USER", ""),
+				SMTPPass:  getEnv("SMTP_PASS", ""),
+				FromEmail: getEnv("FROM_EMAIL", "noreply@gatehide.com"),
+				FromName:  getEnv("FROM_NAME", "GateHide"),
+				UseTLS:    getEnvBool("SMTP_USE_TLS", true),
+				UseSSL:    getEnvBool("SMTP_USE_SSL", false),
+			},
+		},
 	}
 }
 
@@ -93,6 +125,16 @@ func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intValue, err := strconv.Atoi(value); err == nil {
 			return intValue
+		}
+	}
+	return defaultValue
+}
+
+// getEnvBool retrieves an environment variable as boolean or returns a default value
+func getEnvBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
 		}
 	}
 	return defaultValue

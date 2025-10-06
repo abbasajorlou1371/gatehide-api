@@ -113,3 +113,8 @@ func (s *AuthService) GetUserFromToken(tokenString string) (*utils.JWTClaims, er
 
 	return claims, nil
 }
+
+// GetJWTManager returns the JWT manager instance
+func (s *AuthService) GetJWTManager() *utils.JWTManager {
+	return s.jwtManager
+}
