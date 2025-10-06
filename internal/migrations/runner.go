@@ -130,10 +130,13 @@ func (r *MySQLRunner) RollbackMigration(version, downSQL string) error {
 		return fmt.Errorf("failed to execute rollback for %s: %w", version, err)
 	}
 
-	// Remove migration record
-	deleteQuery := "DELETE FROM migrations WHERE version = ?"
-	if _, err := tx.ExecContext(context.Background(), deleteQuery, version); err != nil {
-		return fmt.Errorf("failed to remove migration record %s: %w", version, err)
+	// Remove migration record (only if migrations table still exists)
+	// Special case: if we're dropping the migrations table itself, skip this step
+	if version != "001_create_migrations_table" {
+		deleteQuery := "DELETE FROM migrations WHERE version = ?"
+		if _, err := tx.ExecContext(context.Background(), deleteQuery, version); err != nil {
+			return fmt.Errorf("failed to remove migration record %s: %w", version, err)
+		}
 	}
 
 	return tx.Commit()

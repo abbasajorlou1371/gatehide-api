@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	migrationsDir = "migrations"
+	migrationsDir = "database/migrations"
 )
 
 func main() {
@@ -176,6 +176,11 @@ func runDown(runner migrations.MigrationRunner, migrationsPath string, steps int
 	// Get applied migrations
 	applied, err := runner.GetAppliedMigrations()
 	if err != nil {
+		// If migrations table doesn't exist, there are no migrations to rollback
+		if strings.Contains(err.Error(), "doesn't exist") || strings.Contains(err.Error(), "Table") {
+			fmt.Println("No applied migrations to rollback.")
+			return nil
+		}
 		return fmt.Errorf("failed to get applied migrations: %w", err)
 	}
 
