@@ -425,9 +425,10 @@ func setupTestRouter(cfg *config.Config, db *sql.DB) *gin.Engine {
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
+	passwordResetRepo := repositories.NewPasswordResetRepository(db)
 
 	// Initialize services
-	authService := services.NewAuthService(userRepo, adminRepo, cfg)
+	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, nil, cfg)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(cfg)

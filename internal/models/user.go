@@ -110,3 +110,42 @@ func CheckPassword(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
 }
+
+// PasswordResetToken represents a password reset token
+type PasswordResetToken struct {
+	ID        int        `json:"id" db:"id"`
+	UserID    int        `json:"user_id" db:"user_id"`
+	UserType  string     `json:"user_type" db:"user_type"`
+	Token     string     `json:"token" db:"token"`
+	ExpiresAt time.Time  `json:"expires_at" db:"expires_at"`
+	UsedAt    *time.Time `json:"used_at" db:"used_at"`
+	CreatedAt time.Time  `json:"created_at" db:"created_at"`
+}
+
+// ForgotPasswordRequest represents a forgot password request
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// ResetPasswordRequest represents a reset password request
+type ResetPasswordRequest struct {
+	Token           string `json:"token" binding:"required"`
+	Email           string `json:"email" binding:"required,email"`
+	NewPassword     string `json:"new_password" binding:"required,min=6"`
+	ConfirmPassword string `json:"confirm_password" binding:"required,min=6"`
+}
+
+// IsExpired checks if the token is expired
+func (prt *PasswordResetToken) IsExpired() bool {
+	return time.Now().After(prt.ExpiresAt)
+}
+
+// IsUsed checks if the token has been used
+func (prt *PasswordResetToken) IsUsed() bool {
+	return prt.UsedAt != nil
+}
+
+// IsValid checks if the token is valid (not expired and not used)
+func (prt *PasswordResetToken) IsValid() bool {
+	return !prt.IsExpired() && !prt.IsUsed()
+}

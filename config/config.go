@@ -98,11 +98,11 @@ func Load() *Config {
 		},
 		Notification: NotificationConfig{
 			Email: EmailConfig{
-				Enabled:   getEnvBool("EMAIL_ENABLED", false),
-				SMTPHost:  getEnv("SMTP_HOST", "localhost"),
-				SMTPPort:  getEnvInt("SMTP_PORT", 587),
-				SMTPUser:  getEnv("SMTP_USER", ""),
-				SMTPPass:  getEnv("SMTP_PASS", ""),
+				Enabled:   getEnvBool("EMAIL_ENABLED", true),
+				SMTPHost:  getEnv("MAIL_HOST", getEnv("SMTP_HOST", "localhost")),
+				SMTPPort:  getEnvInt("MAIL_PORT", getEnvInt("SMTP_PORT", 587)),
+				SMTPUser:  getEnv("MAIL_USERNAME", getEnv("SMTP_USER", "")),
+				SMTPPass:  getEnv("MAIL_PASSWORD", getEnv("SMTP_PASS", "")),
 				FromEmail: getEnv("FROM_EMAIL", "noreply@gatehide.com"),
 				FromName:  getEnv("FROM_NAME", "GateHide"),
 				UseTLS:    getEnvBool("SMTP_USE_TLS", true),

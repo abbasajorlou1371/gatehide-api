@@ -144,3 +144,98 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		"data":    userInfo,
 	})
 }
+
+// ForgotPassword handles forgot password requests
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req models.ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	err := h.authService.ForgotPassword(req.Email)
+	if err != nil {
+		if err.Error() == "email not found" {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Email not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to process password reset request",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Password reset email sent successfully",
+	})
+}
+
+// ResetPassword handles password reset requests
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req models.ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	err := h.authService.ResetPassword(req.Token, req.Email, req.NewPassword, req.ConfirmPassword)
+	if err != nil {
+		if err.Error() == "invalid or expired token" || err.Error() == "token is expired or already used" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Invalid or expired token",
+			})
+			return
+		}
+		if err.Error() == "passwords do not match" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Passwords do not match",
+			})
+			return
+		}
+		if err.Error() == "password must be at least 6 characters long" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Password must be at least 6 characters long",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to reset password",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Password reset successfully",
+	})
+}
+
+// ValidateResetToken validates a password reset token
+func (h *AuthHandler) ValidateResetToken(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Token is required",
+		})
+		return
+	}
+
+	err := h.authService.ValidateResetToken(token)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid or expired token",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Token is valid",
+	})
+}

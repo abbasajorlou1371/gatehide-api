@@ -1,4 +1,7 @@
--- Create notifications table
+-- version: 004_create_notifications_table
+-- description: Create notifications table
+
+-- UP
 CREATE TABLE IF NOT EXISTS notifications (
     id INT AUTO_INCREMENT PRIMARY KEY,
     type ENUM('email', 'sms', 'database') NOT NULL,
@@ -25,3 +28,6 @@ CREATE TABLE IF NOT EXISTS notifications (
     INDEX idx_notifications_scheduled_at (scheduled_at),
     INDEX idx_notifications_template_id (template_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- DOWN
+DROP TABLE IF EXISTS notifications;

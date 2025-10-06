@@ -64,15 +64,130 @@ func (s *NotificationTemplateSeeder) seedTemplates() error {
 			UpdatedAt:   time.Now(),
 		},
 		{
-			Name:        "password_reset_email",
-			Type:        models.NotificationTypeEmail,
-			Subject:     "Password Reset - {{app_name}}",
-			Content:     "Hi {{user_name}},\n\nYou requested a password reset for your {{app_name}} account.\n\nClick the link below to reset your password:\n{{reset_link}}\n\nThis link will expire in {{expiry_hours}} hours.\n\nIf you didn't request this, please ignore this email.\n\nBest regards,\nThe {{app_name}} Team",
-			HTMLContent: "<h2>Password Reset - {{app_name}}</h2><p>Hi {{user_name}},</p><p>You requested a password reset for your {{app_name}} account.</p><p><a href=\"{{reset_link}}\">Click here to reset your password</a></p><p>This link will expire in {{expiry_hours}} hours.</p><p>If you didn't request this, please ignore this email.</p><p>Best regards,<br>The {{app_name}} Team</p>",
-			Variables:   []string{"app_name", "user_name", "reset_link", "expiry_hours"},
-			IsActive:    true,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
+			Name:    "password_reset_email",
+			Type:    models.NotificationTypeEmail,
+			Subject: "بازنشانی رمز عبور - {{app_name}}",
+			Content: "کاربر گرامی {{user_name}}،\n\nدرخواست بازنشانی رمز عبور برای حساب کاربری شما در {{app_name}} دریافت شده است.\n\nبرای تنظیم رمز عبور جدید، لطفاً روی لینک زیر کلیک کنید:\n{{reset_link}}\n\nاین لینک تا {{expiry_hours}} ساعت معتبر است.\n\nاگر شما این درخواست را انجام نداده‌اید، لطفاً این ایمیل را نادیده بگیرید.\n\nبا احترام،\nتیم {{app_name}}",
+			HTMLContent: `<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بازنشانی رمز عبور</title>
+    <style>
+        body {
+            font-family: 'Tahoma', 'Arial', sans-serif;
+            direction: rtl;
+            text-align: right;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            color: #333333;
+            font-size: 16px;
+        }
+        .content p {
+            margin-bottom: 20px;
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 15px 30px;
+            background-color: #007BFF;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #856404;
+        }
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #666666;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+        }
+        .footer a {
+            color: #007BFF;
+            text-decoration: none;
+        }
+        .unsubscribe {
+            margin-top: 15px;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>بازنشانی رمز عبور</h1>
+        </div>
+        <div class="content">
+            <p>کاربر گرامی {{user_name}}،</p>
+            <p>درخواست بازنشانی رمز عبور برای حساب کاربری شما در <strong>{{app_name}}</strong> دریافت شده است.</p>
+            <p>برای تنظیم رمز عبور جدید، لطفاً روی دکمه زیر کلیک کنید:</p>
+            
+            <div class="button-container">
+                <a href="{{reset_link}}" class="button">بازنشانی رمز عبور</a>
+            </div>
+            
+            <div class="warning">
+                <strong>توجه:</strong> این لینک تا {{expiry_hours}} ساعت معتبر است و فقط یک بار قابل استفاده است.
+            </div>
+            
+            <p>اگر شما این درخواست را انجام نداده‌اید، لطفاً این ایمیل را نادیده بگیرید. رمز عبور شما تغییر نخواهد کرد.</p>
+        </div>
+        <div class="footer">
+            <p>© 2025 {{app_name}}. تمامی حقوق محفوظ است.</p>
+            <div class="unsubscribe">
+                <a href="{{unsubscribe_link}}">لغو اشتراک</a> | 
+                <a href="{{support_link}}">پشتیبانی</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>`,
+			Variables: []string{"app_name", "user_name", "reset_link", "expiry_hours", "unsubscribe_link", "support_link"},
+			IsActive:  true,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		},
 		{
 			Name:        "login_notification_email",

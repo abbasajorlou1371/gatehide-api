@@ -140,3 +140,18 @@ func (m *MockAuthService) GetUserFromToken(tokenString string) (*utils.JWTClaims
 	args := m.Called(tokenString)
 	return args.Get(0).(*utils.JWTClaims), args.Error(1)
 }
+
+func (m *MockAuthService) ForgotPassword(email string) error {
+	args := m.Called(email)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) ResetPassword(token, email, newPassword, confirmPassword string) error {
+	args := m.Called(token, email, newPassword, confirmPassword)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) ValidateResetToken(token string) error {
+	args := m.Called(token)
+	return args.Error(0)
+}

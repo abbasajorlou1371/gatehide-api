@@ -1,4 +1,7 @@
--- Create notification_templates table
+-- version: 005_create_notification_templates_table
+-- description: Create notification_templates table
+
+-- UP
 CREATE TABLE IF NOT EXISTS notification_templates (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -16,3 +19,6 @@ CREATE TABLE IF NOT EXISTS notification_templates (
     INDEX idx_templates_is_active (is_active),
     INDEX idx_templates_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- DOWN
+DROP TABLE IF EXISTS notification_templates;

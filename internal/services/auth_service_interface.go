@@ -11,4 +11,7 @@ type AuthServiceInterface interface {
 	ValidateToken(tokenString string) (*utils.JWTClaims, error)
 	RefreshToken(tokenString string, rememberMe bool) (string, error)
 	GetUserFromToken(tokenString string) (*utils.JWTClaims, error)
+	ForgotPassword(email string) error
+	ResetPassword(token, email, newPassword, confirmPassword string) error
+	ValidateResetToken(token string) error
 }

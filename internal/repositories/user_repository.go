@@ -11,12 +11,14 @@ import (
 type UserRepository interface {
 	GetByEmail(email string) (*models.User, error)
 	UpdateLastLogin(id int) error
+	UpdatePassword(id int, hashedPassword string) error
 }
 
 // AdminRepository defines the interface for admin data operations
 type AdminRepository interface {
 	GetByEmail(email string) (*models.Admin, error)
 	UpdateLastLogin(id int) error
+	UpdatePassword(id int, hashedPassword string) error
 }
 
 // userRepository implements UserRepository interface
@@ -82,6 +84,18 @@ func (r *userRepository) UpdateLastLogin(id int) error {
 	return nil
 }
 
+// UpdatePassword updates the password for a user
+func (r *userRepository) UpdatePassword(id int, hashedPassword string) error {
+	query := `UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?`
+
+	_, err := r.db.Exec(query, hashedPassword, id)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	return nil
+}
+
 // GetByEmail retrieves an admin by email
 func (r *adminRepository) GetByEmail(email string) (*models.Admin, error) {
 	query := `
@@ -120,6 +134,18 @@ func (r *adminRepository) UpdateLastLogin(id int) error {
 	_, err := r.db.Exec(query, id)
 	if err != nil {
 		return fmt.Errorf("failed to update last login: %w", err)
+	}
+
+	return nil
+}
+
+// UpdatePassword updates the password for an admin
+func (r *adminRepository) UpdatePassword(id int, hashedPassword string) error {
+	query := `UPDATE admins SET password = ?, updated_at = NOW() WHERE id = ?`
+
+	_, err := r.db.Exec(query, hashedPassword, id)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
 	}
 
 	return nil

@@ -186,6 +186,14 @@ func (s *EmailService) createMessage(email *models.EmailNotification) ([]byte, e
 	message.WriteString(fmt.Sprintf("Date: %s\r\n", time.Now().Format(time.RFC1123Z)))
 	message.WriteString("MIME-Version: 1.0\r\n")
 
+	// Gmail and Yahoo compliance headers
+	message.WriteString("X-Mailer: GateHide API v1.0\r\n")
+	message.WriteString("X-Report-Abuse: Please report abuse to abuse@gatehide.com\r\n")
+	message.WriteString("List-Unsubscribe: <http://localhost:3000/unsubscribe>, <mailto:unsubscribe@gatehide.com>\r\n")
+	message.WriteString("List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n")
+	message.WriteString("Precedence: bulk\r\n")
+	message.WriteString("X-Auto-Response-Suppress: All\r\n")
+
 	// Priority header
 	switch email.Priority {
 	case models.NotificationPriorityHigh, models.NotificationPriorityUrgent:

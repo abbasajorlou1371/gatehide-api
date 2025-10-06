@@ -22,13 +22,14 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
+	passwordResetRepo := repositories.NewPasswordResetRepository(db)
 	notificationRepo := repositories.NewMySQLNotificationRepository(db)
 
 	// Initialize services
-	authService := services.NewAuthService(userRepo, adminRepo, cfg)
 	emailService := services.NewEmailService(&cfg.Notification.Email)
 	notificationService := services.NewNotificationService(
 		emailService, nil, nil, nil, notificationRepo, cfg)
+	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, notificationService, cfg)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(cfg)
@@ -52,6 +53,11 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 				auth.POST("/login", authHandler.Login)
 				auth.POST("/refresh", authHandler.RefreshToken)
 				auth.POST("/logout", authHandler.Logout)
+
+				// Password reset routes
+				auth.POST("/forgot-password", authHandler.ForgotPassword)
+				auth.POST("/reset-password", authHandler.ResetPassword)
+				auth.GET("/validate-reset-token", authHandler.ValidateResetToken)
 			}
 		}
 

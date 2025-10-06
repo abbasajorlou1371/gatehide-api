@@ -117,7 +117,7 @@ func TestEmailService_Disabled(t *testing.T) {
 		Body:    "Test Body",
 	}
 
-	err := emailService.SendEmail(nil, email)
+	err := emailService.SendEmail(context.TODO(), email)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "email service is disabled")
 }
@@ -171,7 +171,7 @@ func TestEmailService_InvalidEmailAddresses(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := emailService.SendEmail(nil, tt.email)
+			err := emailService.SendEmail(context.TODO(), tt.email)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "invalid email address")
 		})
@@ -201,7 +201,7 @@ func TestEmailService_PriorityHeaders(t *testing.T) {
 		Priority: models.NotificationPriorityHigh,
 	}
 
-	err := emailService.SendEmail(nil, highPriorityEmail)
+	err := emailService.SendEmail(context.Background(), highPriorityEmail)
 	// This will fail because we don't have a real SMTP server, but we can test the validation
 	assert.Error(t, err)
 	// The error should be about connection, not validation
@@ -215,7 +215,7 @@ func TestEmailService_PriorityHeaders(t *testing.T) {
 		Priority: models.NotificationPriorityLow,
 	}
 
-	err = emailService.SendEmail(nil, lowPriorityEmail)
+	err = emailService.SendEmail(context.Background(), lowPriorityEmail)
 	assert.Error(t, err)
 	assert.NotContains(t, err.Error(), "invalid email address")
 }
