@@ -229,12 +229,13 @@ func (s *AuthService) ResetPassword(token, email, newPassword, confirmPassword s
 	}
 
 	// Validate that the email matches the token's user
-	if resetToken.UserType == "user" {
+	switch resetToken.UserType {
+	case "user":
 		user, err := s.userRepo.GetByEmail(email)
 		if err != nil || user.ID != resetToken.UserID {
 			return fmt.Errorf("invalid email for this token")
 		}
-	} else if resetToken.UserType == "admin" {
+	case "admin":
 		admin, err := s.adminRepo.GetByEmail(email)
 		if err != nil || admin.ID != resetToken.UserID {
 			return fmt.Errorf("invalid email for this token")
@@ -248,15 +249,16 @@ func (s *AuthService) ResetPassword(token, email, newPassword, confirmPassword s
 	}
 
 	// Update password based on user type
-	if resetToken.UserType == "user" {
+	switch resetToken.UserType {
+	case "user":
 		if err := s.userRepo.UpdatePassword(resetToken.UserID, hashedPassword); err != nil {
 			return fmt.Errorf("failed to update user password: %w", err)
 		}
-	} else if resetToken.UserType == "admin" {
+	case "admin":
 		if err := s.adminRepo.UpdatePassword(resetToken.UserID, hashedPassword); err != nil {
 			return fmt.Errorf("failed to update admin password: %w", err)
 		}
-	} else {
+	default:
 		return fmt.Errorf("invalid user type")
 	}
 
@@ -295,8 +297,8 @@ func (s *AuthService) sendPasswordResetEmail(email, name, token string) error {
 
 	// Create reset link with email parameter
 	resetLink := fmt.Sprintf("http://localhost:3000/reset-password?token=%s&email=%s", token, email)
-	unsubscribeLink := fmt.Sprintf("http://localhost:3000/unsubscribe?email=%s", email)
-	supportLink := fmt.Sprintf("http://localhost:3000/support")
+	unsubscribeLink := "http://localhost:3000/unsubscribe?email=" + email
+	supportLink := "http://localhost:3000/support"
 
 	// Create notification request
 	notification := &models.CreateNotificationRequest{
@@ -304,7 +306,7 @@ func (s *AuthService) sendPasswordResetEmail(email, name, token string) error {
 		Priority:  models.NotificationPriorityHigh,
 		Recipient: email,
 		Subject:   fmt.Sprintf("بازنشانی رمز عبور - %s", s.config.App.Name),
-		Content:   fmt.Sprintf("کاربر گرامی %s،\n\nدرخواست بازنشانی رمز عبور برای حساب کاربری شما در %s دریافت شده است.\n\nبرای تنظیم رمز عبور جدید، لطفاً روی لینک زیر کلیک کنید:\n%s\n\nاین لینک تا 0.25 ساعت معتبر است.\n\nاگر شما این درخواست را انجام نداده‌اید، لطفاً این ایمیل را نادیده بگیرید.\n\nبا احترام،\nتیم %s", name, s.config.App.Name, resetLink, s.config.App.Name),
+		Content:   fmt.Sprintf("کاربر گرامی %s،\n\nدرخواست بازنشانی رمز عبور برای حساب کاربری شما در %s دریافت شده است.\n\nبرای تنظیم رمز عبور جدید، لطفاً روی لینک زیر کلیک کنید:\n%s\n\nاین لینک تا 0.25 ساعت معتبر است.\n\nاگر شما این درخواست را انجام نداده\u200cاید، لطفاً این ایمیل را نادیده بگیرید.\n\nبا احترام،\nتیم %s", name, s.config.App.Name, resetLink, s.config.App.Name),
 		TemplateData: map[string]interface{}{
 			"app_name":         s.config.App.Name,
 			"user_name":        name,
