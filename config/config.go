@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -12,6 +13,7 @@ type Config struct {
 	Server   ServerConfig
 	App      AppConfig
 	Security SecurityConfig
+	Database DatabaseConfig
 }
 
 // ServerConfig holds server-related configuration
@@ -29,6 +31,17 @@ type AppConfig struct {
 // SecurityConfig holds security-related configuration
 type SecurityConfig struct {
 	APISecret string
+}
+
+// DatabaseConfig holds database-related configuration
+type DatabaseConfig struct {
+	Host     string
+	Port     string
+	User     string
+	Password string
+	DBName   string
+	SSLMode  string
+	Driver   string
 }
 
 // Load reads configuration from environment variables
@@ -50,6 +63,15 @@ func Load() *Config {
 		Security: SecurityConfig{
 			APISecret: getEnv("API_SECRET", "default-secret-key"),
 		},
+		Database: DatabaseConfig{
+			Host:     getEnv("DB_HOST", "localhost"),
+			Port:     getEnv("DB_PORT", "3306"),
+			User:     getEnv("DB_USER", "root"),
+			Password: getEnv("DB_PASSWORD", ""),
+			DBName:   getEnv("DB_NAME", "gatehide"),
+			SSLMode:  getEnv("DB_SSLMODE", "false"),
+			Driver:   getEnv("DB_DRIVER", "mysql"),
+		},
 	}
 }
 
@@ -59,4 +81,60 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// GetDSN returns the database connection string
+func (c *Config) GetDSN() string {
+	switch c.Database.Driver {
+	case "mysql":
+		return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local",
+			c.Database.User,
+			c.Database.Password,
+			c.Database.Host,
+			c.Database.Port,
+			c.Database.DBName,
+		)
+	case "postgres":
+		sslMode := "disable"
+		if c.Database.SSLMode == "true" {
+			sslMode = "require"
+		}
+		return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+			c.Database.Host,
+			c.Database.Port,
+			c.Database.User,
+			c.Database.Password,
+			c.Database.DBName,
+			sslMode,
+		)
+	default:
+		return ""
+	}
+}
+
+// GetServerDSN returns the database server connection string (without database name)
+func (c *Config) GetServerDSN() string {
+	switch c.Database.Driver {
+	case "mysql":
+		return fmt.Sprintf("%s:%s@tcp(%s:%s)/?parseTime=true&loc=Local",
+			c.Database.User,
+			c.Database.Password,
+			c.Database.Host,
+			c.Database.Port,
+		)
+	case "postgres":
+		sslMode := "disable"
+		if c.Database.SSLMode == "true" {
+			sslMode = "require"
+		}
+		return fmt.Sprintf("host=%s port=%s user=%s password=%s sslmode=%s",
+			c.Database.Host,
+			c.Database.Port,
+			c.Database.User,
+			c.Database.Password,
+			sslMode,
+		)
+	default:
+		return ""
+	}
 }

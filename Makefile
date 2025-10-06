@@ -1,4 +1,4 @@
-.PHONY: help run build test clean install lint fmt dev hot
+.PHONY: help run build test clean install lint fmt dev hot migrate-status migrate-up migrate-down migrate-create migrate-build migrate-reset migrate-fresh
 
 # Variables
 BINARY_NAME=gatehide-api
@@ -47,4 +47,39 @@ dev: ## Run in development mode with auto-reload (requires air)
 hot: ## Run with hot reloading (alias for dev)
 	@echo "🔥 Starting with hot reload..."
 	@export PATH=$$PATH:$$(go env GOPATH)/bin && air
+
+# Migration commands
+migrate-build: ## Build migration CLI tool
+	@echo "🔨 Building migration CLI..."
+	@go build -o $(BUILD_DIR)/migrate cmd/migrate/main.go
+	@echo "✅ Migration CLI built: $(BUILD_DIR)/migrate"
+
+migrate-status: ## Show migration status
+	@echo "📊 Checking migration status..."
+	@DB_AUTO_CREATE=true go run cmd/migrate/main.go -command=status
+
+migrate-up: ## Run pending migrations (optionally specify steps with STEPS=n)
+	@echo "⬆️  Running pending migrations..."
+	@DB_AUTO_CREATE=true go run cmd/migrate/main.go -command=up -steps=$${STEPS:-1}
+
+migrate-down: ## Rollback migrations (optionally specify steps with STEPS=n)
+	@echo "⬇️  Rolling back migrations..."
+	@DB_AUTO_CREATE=true go run cmd/migrate/main.go -command=down -steps=$${STEPS:-1}
+
+migrate-create: ## Create a new migration file (usage: make migrate-create NAME="create_users_table")
+	@if [ -z "$(NAME)" ]; then \
+		echo "❌ Please specify migration name: make migrate-create NAME=\"create_users_table\""; \
+		exit 1; \
+	fi
+	@echo "📝 Creating migration: $(NAME)..."
+	@go run cmd/migrate/main.go -command=create -name="$(NAME)"
+
+migrate-reset: ## Reset database (rollback all migrations)
+	@echo "🔄 Resetting database..."
+	@DB_AUTO_CREATE=true go run cmd/migrate/main.go -command=down -steps=999
+
+migrate-fresh: ## Fresh migration (reset and run all migrations)
+	@echo "🆕 Fresh migration..."
+	@$(MAKE) migrate-reset
+	@$(MAKE) migrate-up STEPS=999
 
