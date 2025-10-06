@@ -40,7 +40,7 @@ func TestJWTManager_GenerateToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			token, err := jwtManager.GenerateToken(tt.userID, tt.userType, tt.email, tt.userName)
+			token, err := jwtManager.GenerateToken(tt.userID, tt.userType, tt.email, tt.userName, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("JWTManager.GenerateToken() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -58,7 +58,7 @@ func TestJWTManager_ValidateToken(t *testing.T) {
 	jwtManager := utils.NewJWTManager(cfg)
 
 	// Generate a valid token
-	token, err := jwtManager.GenerateToken(1, "user", "test@example.com", "Test User")
+	token, err := jwtManager.GenerateToken(1, "user", "test@example.com", "Test User", false)
 	if err != nil {
 		t.Fatalf("Failed to generate token: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestJWTManager_RefreshToken(t *testing.T) {
 	jwtManager := utils.NewJWTManager(cfg)
 
 	// Generate a token that's close to expiration (within 1 hour)
-	token, err := jwtManager.GenerateToken(1, "user", "test@example.com", "Test User")
+	token, err := jwtManager.GenerateToken(1, "user", "test@example.com", "Test User", false)
 	if err != nil {
 		t.Fatalf("Failed to generate token: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestJWTManager_RefreshToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			newToken, err := jwtManager.RefreshToken(tt.token)
+			newToken, err := jwtManager.RefreshToken(tt.token, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("JWTManager.RefreshToken() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -176,7 +176,7 @@ func TestJWTManager_TokenExpiration(t *testing.T) {
 	cfg := testutils.TestConfig()
 	jwtManager := utils.NewJWTManager(cfg)
 
-	token, err := jwtManager.GenerateToken(1, "user", "test@example.com", "Test User")
+	token, err := jwtManager.GenerateToken(1, "user", "test@example.com", "Test User", false)
 	if err != nil {
 		t.Fatalf("Failed to generate token: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestJWTManager_DifferentUserTypes(t *testing.T) {
 
 	for _, userType := range userTypes {
 		t.Run("user_type_"+userType, func(t *testing.T) {
-			token, err := jwtManager.GenerateToken(1, userType, "test@example.com", "Test User")
+			token, err := jwtManager.GenerateToken(1, userType, "test@example.com", "Test User", false)
 			if err != nil {
 				t.Fatalf("Failed to generate token for user type %s: %v", userType, err)
 			}
@@ -230,7 +230,7 @@ func TestJWTManager_TokenStructure(t *testing.T) {
 	email := "test@example.com"
 	userName := "Test User"
 
-	token, err := jwtManager.GenerateToken(userID, userType, email, userName)
+	token, err := jwtManager.GenerateToken(userID, userType, email, userName, false)
 	if err != nil {
 		t.Fatalf("Failed to generate token: %v", err)
 	}

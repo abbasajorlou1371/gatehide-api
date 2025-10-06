@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gatehide/gatehide-api/internal/models"
 	"github.com/gatehide/gatehide-api/internal/services"
@@ -36,7 +38,13 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		tokenString = authHeader[7:]
 	}
 
-	newToken, err := h.authService.RefreshToken(tokenString)
+	// Get remember me preference from request body (optional)
+	var req struct {
+		RememberMe bool `json:"remember_me"`
+	}
+	c.ShouldBindJSON(&req) // Ignore errors, default to false
+
+	newToken, err := h.authService.RefreshToken(tokenString, req.RememberMe)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "Invalid or expired token",
@@ -52,12 +60,46 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	})
 }
 
-// Logout handles logout requests (client-side token removal)
+// Logout handles logout requests with token validation and logging
 func (h *AuthHandler) Logout(c *gin.Context) {
+	// Extract token from Authorization header
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Authorization header required",
+		})
+		return
+	}
+
+	// Extract token from "Bearer <token>" format
+	tokenString := authHeader
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		tokenString = authHeader[7:]
+	}
+
+	// Validate token to get user information for logging
+	claims, err := h.authService.ValidateToken(tokenString)
+	if err != nil {
+		// Even if token is invalid, we should still allow logout
+		// This handles cases where token expired but user wants to logout
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Logout successful",
+		})
+		return
+	}
+
+	// Log the logout event for security auditing
+	fmt.Printf("User logout: ID=%d, Email=%s, Type=%s, Time=%s\n",
+		claims.UserID, claims.Email, claims.UserType, time.Now().Format(time.RFC3339))
+
 	// Since we're using stateless JWT tokens, logout is handled client-side
-	// by removing the token from storage. This endpoint just confirms the logout.
+	// by removing the token from storage. This endpoint confirms the logout.
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Logout successful",
+		"data": gin.H{
+			"user_id":   claims.UserID,
+			"user_type": claims.UserType,
+		},
 	})
 }
 
@@ -72,7 +114,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	response, err := h.authService.Login(req.Email, req.Password)
+	response, err := h.authService.Login(req.Email, req.Password, req.RememberMe)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": err.Error(),

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gatehide/gatehide-api/config"
@@ -23,8 +24,11 @@ func TestAuthenticationIntegration_UserLogin(t *testing.T) {
 	utils.SkipIfNoDB(t)
 
 	db := utils.SetupTestDB(t)
-	defer utils.CleanupTestDBForce(t, db)
 	defer db.Close()
+	defer utils.CleanupTestDBForce(t, db)
+
+	// Clean up any existing test data before starting
+	utils.CleanupTestDBForce(t, db)
 
 	// Setup test data with unique email
 	testUser := utils.CreateTestUser(t, db, "user1@example.com", "password123", "Test User 1")
@@ -112,8 +116,8 @@ func TestAuthenticationIntegration_AdminLogin(t *testing.T) {
 	utils.SkipIfNoDB(t)
 
 	db := utils.SetupTestDB(t)
-	defer utils.CleanupTestDBForce(t, db)
 	defer db.Close()
+	defer utils.CleanupTestDBForce(t, db)
 
 	// Setup test data with unique email
 	testAdmin := utils.CreateTestAdmin(t, db, "admin1@example.com", "admin123", "Test Admin 1")
@@ -192,8 +196,8 @@ func TestAuthenticationIntegration_ProtectedRoutes(t *testing.T) {
 	utils.SkipIfNoDB(t)
 
 	db := utils.SetupTestDB(t)
-	defer utils.CleanupTestDBForce(t, db)
 	defer db.Close()
+	defer utils.CleanupTestDBForce(t, db)
 
 	// Setup test data with unique emails
 	_ = utils.CreateTestUser(t, db, "user2@example.com", "password123", "Test User 2")
@@ -284,8 +288,8 @@ func TestAuthenticationIntegration_TokenRefresh(t *testing.T) {
 	utils.SkipIfNoDB(t)
 
 	db := utils.SetupTestDB(t)
-	defer utils.CleanupTestDBForce(t, db)
 	defer db.Close()
+	defer utils.CleanupTestDBForce(t, db)
 
 	// Setup test data with unique email
 	_ = utils.CreateTestUser(t, db, "user3@example.com", "password123", "Test User 3")
@@ -366,21 +370,47 @@ func TestAuthenticationIntegration_TokenRefresh(t *testing.T) {
 }
 
 func TestAuthenticationIntegration_Logout(t *testing.T) {
+	utils.SkipIfNoDB(t)
+
 	cfg := utils.TestConfig()
 	db := utils.SetupTestDB(t)
-	defer utils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer utils.CleanupTestDBForce(t, db)
+
+	// Setup test data
+	_ = utils.CreateTestUser(t, db, "logout@example.com", "password123", "Logout Test User")
 
 	router := setupTestRouter(cfg, db)
 
+	// First, login to get a valid token
+	loginReq := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{
+		"email": "logout@example.com",
+		"password": "password123"
+	}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	router.ServeHTTP(loginW, loginReq)
+
+	assert.Equal(t, http.StatusOK, loginW.Code)
+
+	var loginResponse map[string]interface{}
+	err := json.Unmarshal(loginW.Body.Bytes(), &loginResponse)
+	assert.NoError(t, err)
+	assert.Contains(t, loginResponse, "data")
+
+	data := loginResponse["data"].(map[string]interface{})
+	token := data["token"].(string)
+
+	// Now test logout with the token
 	req := httptest.NewRequest("POST", "/api/v1/auth/logout", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
+	err = json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Contains(t, response, "message")
 	assert.Equal(t, "Logout successful", response["message"])

@@ -19,28 +19,37 @@ type JWTClaims struct {
 
 // JWTManager handles JWT operations
 type JWTManager struct {
-	secret     []byte
-	expiration time.Duration
+	secret             []byte
+	expiration         time.Duration
+	rememberExpiration time.Duration
 }
 
 // NewJWTManager creates a new JWT manager
 func NewJWTManager(cfg *config.Config) *JWTManager {
 	return &JWTManager{
-		secret:     []byte(cfg.Security.JWTSecret),
-		expiration: time.Duration(cfg.Security.JWTExpiration) * time.Hour,
+		secret:             []byte(cfg.Security.JWTSecret),
+		expiration:         time.Duration(cfg.Security.JWTExpiration) * time.Hour,
+		rememberExpiration: time.Duration(cfg.Security.JWTExpiration) * time.Hour * 24 * 7, // 7 days for remember me
 	}
 }
 
 // GenerateToken generates a new JWT token for the given user
-func (j *JWTManager) GenerateToken(userID int, userType, email, name string) (string, error) {
+func (j *JWTManager) GenerateToken(userID int, userType, email, name string, rememberMe bool) (string, error) {
 	now := time.Now()
+
+	// Choose expiration based on remember me
+	expiration := j.expiration
+	if rememberMe {
+		expiration = j.rememberExpiration
+	}
+
 	claims := JWTClaims{
 		UserID:   userID,
 		UserType: userType,
 		Email:    email,
 		Name:     name,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(now.Add(j.expiration)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(expiration)),
 			IssuedAt:  jwt.NewNumericDate(now),
 			NotBefore: jwt.NewNumericDate(now),
 			Issuer:    "gatehide-api",
@@ -74,7 +83,7 @@ func (j *JWTManager) ValidateToken(tokenString string) (*JWTClaims, error) {
 }
 
 // RefreshToken generates a new token with extended expiration
-func (j *JWTManager) RefreshToken(tokenString string) (string, error) {
+func (j *JWTManager) RefreshToken(tokenString string, rememberMe bool) (string, error) {
 	claims, err := j.ValidateToken(tokenString)
 	if err != nil {
 		return "", err
@@ -85,5 +94,5 @@ func (j *JWTManager) RefreshToken(tokenString string) (string, error) {
 
 	// For testing, always generate a new token
 	// In production, you might want to check if token is close to expiration
-	return j.GenerateToken(claims.UserID, claims.UserType, claims.Email, claims.Name)
+	return j.GenerateToken(claims.UserID, claims.UserType, claims.Email, claims.Name, rememberMe)
 }

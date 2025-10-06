@@ -121,8 +121,8 @@ type MockAuthService struct {
 	mock.Mock
 }
 
-func (m *MockAuthService) Login(email, password string) (*models.LoginResponse, error) {
-	args := m.Called(email, password)
+func (m *MockAuthService) Login(email, password string, rememberMe bool) (*models.LoginResponse, error) {
+	args := m.Called(email, password, rememberMe)
 	return args.Get(0).(*models.LoginResponse), args.Error(1)
 }
 
@@ -131,8 +131,8 @@ func (m *MockAuthService) ValidateToken(tokenString string) (*utils.JWTClaims, e
 	return args.Get(0).(*utils.JWTClaims), args.Error(1)
 }
 
-func (m *MockAuthService) RefreshToken(tokenString string) (string, error) {
-	args := m.Called(tokenString)
+func (m *MockAuthService) RefreshToken(tokenString string, rememberMe bool) (string, error) {
+	args := m.Called(tokenString, rememberMe)
 	return args.String(0), args.Error(1)
 }
 

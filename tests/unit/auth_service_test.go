@@ -12,8 +12,11 @@ func TestAuthService_LoginUser(t *testing.T) {
 	testutils.SkipIfNoDB(t)
 
 	db := testutils.SetupTestDB(t)
-	defer testutils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer testutils.CleanupTestDB(t, db)
+
+	// Ensure database is clean before starting
+	testutils.CleanupTestDB(t, db)
 
 	userRepo := repositories.NewUserRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
@@ -63,7 +66,7 @@ func TestAuthService_LoginUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response, err := authService.Login(tt.email, tt.password)
+			response, err := authService.Login(tt.email, tt.password, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AuthService.Login() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -95,8 +98,8 @@ func TestAuthService_LoginAdmin(t *testing.T) {
 	testutils.SkipIfNoDB(t)
 
 	db := testutils.SetupTestDB(t)
-	defer testutils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer testutils.CleanupTestDB(t, db)
 
 	userRepo := repositories.NewUserRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
@@ -146,7 +149,7 @@ func TestAuthService_LoginAdmin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response, err := authService.Login(tt.email, tt.password)
+			response, err := authService.Login(tt.email, tt.password, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AuthService.Login() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -178,8 +181,8 @@ func TestAuthService_Login_Unified(t *testing.T) {
 	testutils.SkipIfNoDB(t)
 
 	db := testutils.SetupTestDB(t)
-	defer testutils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer testutils.CleanupTestDB(t, db)
 
 	userRepo := repositories.NewUserRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
@@ -239,7 +242,7 @@ func TestAuthService_Login_Unified(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response, err := authService.Login(tt.email, tt.password)
+			response, err := authService.Login(tt.email, tt.password, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AuthService.Login() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -271,8 +274,8 @@ func TestAuthService_ValidateToken(t *testing.T) {
 	testutils.SkipIfNoDB(t)
 
 	db := testutils.SetupTestDB(t)
-	defer testutils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer testutils.CleanupTestDB(t, db)
 
 	userRepo := repositories.NewUserRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
@@ -281,7 +284,7 @@ func TestAuthService_ValidateToken(t *testing.T) {
 
 	// Create a test user and get a valid token
 	testUser := testutils.CreateTestUser(t, db, "user3@example.com", "password123", "Test User 3")
-	loginResponse, err := authService.Login(testUser.Email, "password123")
+	loginResponse, err := authService.Login(testUser.Email, "password123", false)
 	if err != nil {
 		t.Fatalf("Failed to login user for token validation test: %v", err)
 	}
@@ -338,8 +341,8 @@ func TestAuthService_RefreshToken(t *testing.T) {
 	testutils.SkipIfNoDB(t)
 
 	db := testutils.SetupTestDB(t)
-	defer testutils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer testutils.CleanupTestDB(t, db)
 
 	userRepo := repositories.NewUserRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
@@ -348,7 +351,7 @@ func TestAuthService_RefreshToken(t *testing.T) {
 
 	// Create a test user and get a valid token
 	testUser := testutils.CreateTestUser(t, db, "user4@example.com", "password123", "Test User 4")
-	loginResponse, err := authService.Login(testUser.Email, "password123")
+	loginResponse, err := authService.Login(testUser.Email, "password123", false)
 	if err != nil {
 		t.Fatalf("Failed to login user for token refresh test: %v", err)
 	}
@@ -372,7 +375,7 @@ func TestAuthService_RefreshToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			newToken, err := authService.RefreshToken(tt.token)
+			newToken, err := authService.RefreshToken(tt.token, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AuthService.RefreshToken() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -401,8 +404,8 @@ func TestAuthService_GetUserFromToken(t *testing.T) {
 	testutils.SkipIfNoDB(t)
 
 	db := testutils.SetupTestDB(t)
-	defer testutils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer testutils.CleanupTestDB(t, db)
 
 	userRepo := repositories.NewUserRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
@@ -411,7 +414,7 @@ func TestAuthService_GetUserFromToken(t *testing.T) {
 
 	// Create a test user and get a valid token
 	testUser := testutils.CreateTestUser(t, db, "user5@example.com", "password123", "Test User 5")
-	loginResponse, err := authService.Login(testUser.Email, "password123")
+	loginResponse, err := authService.Login(testUser.Email, "password123", false)
 	if err != nil {
 		t.Fatalf("Failed to login user for GetUserFromToken test: %v", err)
 	}
@@ -463,8 +466,8 @@ func TestAuthService_UserTypeDetection(t *testing.T) {
 	testutils.SkipIfNoDB(t)
 
 	db := testutils.SetupTestDB(t)
-	defer testutils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer testutils.CleanupTestDB(t, db)
 
 	userRepo := repositories.NewUserRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
@@ -500,7 +503,7 @@ func TestAuthService_UserTypeDetection(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response, err := authService.Login(tt.email, tt.password)
+			response, err := authService.Login(tt.email, tt.password, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AuthService.Login() error = %v, wantErr %v", err, tt.wantErr)
 				return

@@ -11,8 +11,8 @@ func TestUserRepository_GetByEmail(t *testing.T) {
 	testutils.SkipIfNoDB(t)
 
 	db := testutils.SetupTestDB(t)
-	defer testutils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer testutils.CleanupTestDB(t, db)
 
 	userRepo := repositories.NewUserRepository(db)
 
@@ -75,8 +75,8 @@ func TestUserRepository_UpdateLastLogin(t *testing.T) {
 	testutils.SkipIfNoDB(t)
 
 	db := testutils.SetupTestDB(t)
-	defer testutils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer testutils.CleanupTestDB(t, db)
 
 	userRepo := repositories.NewUserRepository(db)
 
@@ -114,8 +114,8 @@ func TestAdminRepository_GetByEmail(t *testing.T) {
 	testutils.SkipIfNoDB(t)
 
 	db := testutils.SetupTestDB(t)
-	defer testutils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer testutils.CleanupTestDB(t, db)
 
 	adminRepo := repositories.NewAdminRepository(db)
 
@@ -178,8 +178,8 @@ func TestAdminRepository_UpdateLastLogin(t *testing.T) {
 	testutils.SkipIfNoDB(t)
 
 	db := testutils.SetupTestDB(t)
-	defer testutils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer testutils.CleanupTestDB(t, db)
 
 	adminRepo := repositories.NewAdminRepository(db)
 
@@ -217,8 +217,8 @@ func TestUserRepository_EmailUniqueness(t *testing.T) {
 	testutils.SkipIfNoDB(t)
 
 	db := testutils.SetupTestDB(t)
-	defer testutils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer testutils.CleanupTestDB(t, db)
 
 	userRepo := repositories.NewUserRepository(db)
 
@@ -254,8 +254,8 @@ func TestAdminRepository_EmailUniqueness(t *testing.T) {
 	testutils.SkipIfNoDB(t)
 
 	db := testutils.SetupTestDB(t)
-	defer testutils.CleanupTestDB(t, db)
 	defer db.Close()
+	defer testutils.CleanupTestDB(t, db)
 
 	adminRepo := repositories.NewAdminRepository(db)
 

@@ -39,7 +39,7 @@ func TestAuthHandler_Login(t *testing.T) {
 					User:      models.UserResponse{ID: 1, Email: "user@example.com", Name: "Test User"},
 					ExpiresAt: time.Now().Add(24 * time.Hour),
 				}
-				m.On("Login", "user@example.com", "password123").Return(response, nil)
+				m.On("Login", "user@example.com", "password123", false).Return(response, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedError:  false,
@@ -57,7 +57,7 @@ func TestAuthHandler_Login(t *testing.T) {
 					User:      models.AdminResponse{ID: 1, Email: "admin@example.com", Name: "Test Admin"},
 					ExpiresAt: time.Now().Add(24 * time.Hour),
 				}
-				m.On("Login", "admin@example.com", "admin123").Return(response, nil)
+				m.On("Login", "admin@example.com", "admin123", false).Return(response, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedError:  false,
@@ -69,7 +69,7 @@ func TestAuthHandler_Login(t *testing.T) {
 				Password: "wrongpassword",
 			},
 			mockSetup: func(m *testutils.MockAuthService) {
-				m.On("Login", "user@example.com", "wrongpassword").Return((*models.LoginResponse)(nil), assert.AnError)
+				m.On("Login", "user@example.com", "wrongpassword", false).Return((*models.LoginResponse)(nil), assert.AnError)
 			},
 			expectedStatus: http.StatusUnauthorized,
 			expectedError:  true,
@@ -132,7 +132,7 @@ func TestAuthHandler_RefreshToken(t *testing.T) {
 			name:       "valid token refresh",
 			authHeader: "Bearer valid.jwt.token",
 			mockSetup: func(m *testutils.MockAuthService) {
-				m.On("RefreshToken", "valid.jwt.token").Return("new.jwt.token", nil)
+				m.On("RefreshToken", "valid.jwt.token", false).Return("new.jwt.token", nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedError:  false,
@@ -141,7 +141,7 @@ func TestAuthHandler_RefreshToken(t *testing.T) {
 			name:       "invalid token refresh",
 			authHeader: "Bearer invalid.jwt.token",
 			mockSetup: func(m *testutils.MockAuthService) {
-				m.On("RefreshToken", "invalid.jwt.token").Return("", assert.AnError)
+				m.On("RefreshToken", "invalid.jwt.token", false).Return("", assert.AnError)
 			},
 			expectedStatus: http.StatusUnauthorized,
 			expectedError:  true,
@@ -157,7 +157,7 @@ func TestAuthHandler_RefreshToken(t *testing.T) {
 			name:       "invalid authorization header format",
 			authHeader: "InvalidFormat valid.jwt.token",
 			mockSetup: func(m *testutils.MockAuthService) {
-				m.On("RefreshToken", "InvalidFormat valid.jwt.token").Return("", assert.AnError)
+				m.On("RefreshToken", "InvalidFormat valid.jwt.token", false).Return("", assert.AnError)
 			},
 			expectedStatus: http.StatusUnauthorized,
 			expectedError:  true,
@@ -212,10 +212,18 @@ func TestAuthHandler_Logout(t *testing.T) {
 
 	// Setup handler
 	mockService := new(testutils.MockAuthService)
+	// Setup mock expectation for ValidateToken
+	mockService.On("ValidateToken", "valid.jwt.token").Return(&utils.JWTClaims{
+		UserID:   1,
+		UserType: "user",
+		Email:    "test@example.com",
+		Name:     "Test User",
+	}, nil)
 	handler := handlers.NewAuthHandler(mockService)
 
 	// Setup request
 	req := httptest.NewRequest("POST", "/auth/logout", nil)
+	req.Header.Set("Authorization", "Bearer valid.jwt.token")
 
 	// Setup response recorder
 	w := httptest.NewRecorder()

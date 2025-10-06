@@ -38,19 +38,19 @@ func (s *AuthService) ValidateToken(tokenString string) (*utils.JWTClaims, error
 }
 
 // RefreshToken generates a new token with extended expiration
-func (s *AuthService) RefreshToken(tokenString string) (string, error) {
-	return s.jwtManager.RefreshToken(tokenString)
+func (s *AuthService) RefreshToken(tokenString string, rememberMe bool) (string, error) {
+	return s.jwtManager.RefreshToken(tokenString, rememberMe)
 }
 
 // Login unified authentication that determines user type by email
-func (s *AuthService) Login(email, password string) (*models.LoginResponse, error) {
+func (s *AuthService) Login(email, password string, rememberMe bool) (*models.LoginResponse, error) {
 	// First, try to find the user as a regular user
 	user, userErr := s.userRepo.GetByEmail(email)
 	if userErr == nil {
 		// Verify password for user
 		if models.CheckPassword(password, user.Password) {
 			// Generate JWT token for user
-			token, err := s.jwtManager.GenerateToken(user.ID, "user", user.Email, user.Name)
+			token, err := s.jwtManager.GenerateToken(user.ID, "user", user.Email, user.Name, rememberMe)
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate token: %w", err)
 			}
@@ -78,7 +78,7 @@ func (s *AuthService) Login(email, password string) (*models.LoginResponse, erro
 		// Verify password for admin
 		if models.CheckPassword(password, admin.Password) {
 			// Generate JWT token for admin
-			token, err := s.jwtManager.GenerateToken(admin.ID, "admin", admin.Email, admin.Name)
+			token, err := s.jwtManager.GenerateToken(admin.ID, "admin", admin.Email, admin.Name, rememberMe)
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate token: %w", err)
 			}
