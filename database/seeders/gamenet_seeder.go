@@ -12,11 +12,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// init registers the gamenet seeder
-func init() {
-	RegisterSeeder("gamenet", SeedGamenets)
-}
-
 // GamenetSeeder handles seeding gamenet data
 type GamenetSeeder struct {
 	db *sql.DB

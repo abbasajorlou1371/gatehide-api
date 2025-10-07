@@ -53,9 +53,26 @@ func (r *Registry) Run(name string, cfg *config.Config) error {
 	return seeder(cfg)
 }
 
-// RunAll executes all registered seeders
+// RunAll executes only specified default seeders
 func (r *Registry) RunAll(cfg *config.Config) error {
-	log.Println("Running all seeders...")
+	// Default seeders to run
+	defaultSeeders := []string{"admin", "notification_template"}
+
+	log.Printf("Running default seeders: %v", defaultSeeders)
+
+	for _, name := range defaultSeeders {
+		if err := r.Run(name, cfg); err != nil {
+			return fmt.Errorf("failed to run seeder '%s': %w", name, err)
+		}
+	}
+
+	log.Println("Default seeders completed successfully")
+	return nil
+}
+
+// RunAllSeeders executes all registered seeders (including non-default ones)
+func (r *Registry) RunAllSeeders(cfg *config.Config) error {
+	log.Println("Running all registered seeders...")
 
 	for name := range r.seeders {
 		if err := r.Run(name, cfg); err != nil {
@@ -92,5 +109,5 @@ func RunSeeder(name string, cfg *config.Config) error {
 
 // RunAllSeeders executes all registered seeders from the global registry
 func RunAllSeeders(cfg *config.Config) error {
-	return globalRegistry.RunAll(cfg)
+	return globalRegistry.RunAllSeeders(cfg)
 }

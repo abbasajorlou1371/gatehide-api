@@ -31,6 +31,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	emailVerificationRepo := repositories.NewEmailVerificationRepository(db)
 	notificationRepo := repositories.NewMySQLNotificationRepository(db)
 	gamenetRepo := repositories.NewGamenetRepository(db)
+	subscriptionPlanRepo := repositories.NewSubscriptionPlanRepository(db)
 
 	// Initialize services
 	emailService := services.NewEmailService(&cfg.Notification.Email)
@@ -40,6 +41,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 	sessionService := services.NewSessionService(sessionRepo, cfg)
 	gamenetService := services.NewGamenetService(gamenetRepo)
+	subscriptionPlanService := services.NewSubscriptionPlanService(subscriptionPlanRepo)
 
 	// Initialize file uploader
 	fileUploader := utils.NewFileUploader(&cfg.FileStorage)
@@ -51,6 +53,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	notificationHandler := handlers.NewNotificationHandler(
 		notificationService, nil, nil, authService.GetJWTManager())
 	gamenetHandler := handlers.NewGamenetHandler(gamenetService, fileUploader)
+	subscriptionPlanHandler := handlers.NewSubscriptionPlanHandler(subscriptionPlanService)
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
@@ -112,6 +115,16 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 				gamenets.GET("/:id", gamenetHandler.GetGamenetByID)
 				gamenets.PUT("/:id", gamenetHandler.UpdateGamenet)
 				gamenets.DELETE("/:id", gamenetHandler.DeleteGamenet)
+			}
+
+			// Subscription Plan routes
+			plans := protected.Group("/subscription-plans")
+			{
+				plans.GET("/", subscriptionPlanHandler.GetAllPlans)
+				plans.POST("/", subscriptionPlanHandler.CreatePlan)
+				plans.GET("/:id", subscriptionPlanHandler.GetPlan)
+				plans.PUT("/:id", subscriptionPlanHandler.UpdatePlan)
+				plans.DELETE("/:id", subscriptionPlanHandler.DeletePlan)
 			}
 
 			// Admin-only routes
