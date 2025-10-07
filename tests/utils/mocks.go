@@ -193,6 +193,69 @@ func (m *MockAuthService) LoginWithSession(email, password string, rememberMe bo
 	return args.Get(0).(*models.LoginResponse), args.Error(1)
 }
 
+func (m *MockAuthService) GetUserByID(userID int) (*models.User, error) {
+	args := m.Called(userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.User), args.Error(1)
+}
+
+func (m *MockAuthService) GetAdminByID(adminID int) (*models.Admin, error) {
+	args := m.Called(adminID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Admin), args.Error(1)
+}
+
+func (m *MockAuthService) UpdateUserProfile(userID int, name, mobile, image string) (*models.UserResponse, error) {
+	args := m.Called(userID, name, mobile, image)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.UserResponse), args.Error(1)
+}
+
+func (m *MockAuthService) UpdateAdminProfile(adminID int, name, mobile, image string) (*models.AdminResponse, error) {
+	args := m.Called(adminID, name, mobile, image)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.AdminResponse), args.Error(1)
+}
+
+func (m *MockAuthService) UpdateUserEmail(userID int, newEmail string) (*models.UserResponse, error) {
+	args := m.Called(userID, newEmail)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.UserResponse), args.Error(1)
+}
+
+func (m *MockAuthService) UpdateAdminEmail(adminID int, newEmail string) (*models.AdminResponse, error) {
+	args := m.Called(adminID, newEmail)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.AdminResponse), args.Error(1)
+}
+
+func (m *MockAuthService) SendEmailVerification(userID int, userType, newEmail string) (string, error) {
+	args := m.Called(userID, userType, newEmail)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockAuthService) VerifyEmailCode(userID int, userType, email, code string) (bool, error) {
+	args := m.Called(userID, userType, email, code)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockAuthService) CheckEmailExists(email string) (bool, error) {
+	args := m.Called(email)
+	return args.Bool(0), args.Error(1)
+}
+
 // MockSessionRepository is a mock implementation of SessionRepositoryInterface
 type MockSessionRepository struct {
 	mock.Mock
@@ -298,4 +361,24 @@ func (m *MockNotificationService) UpdateNotificationStatus(ctx context.Context, 
 func (m *MockNotificationService) RetryFailedNotification(ctx context.Context, id int) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
+}
+
+// MockFileUploader is a mock implementation of FileUploader
+type MockFileUploader struct {
+	mock.Mock
+}
+
+func (m *MockFileUploader) UploadFile(file interface{}, subfolder string) (interface{}, error) {
+	args := m.Called(file, subfolder)
+	return args.Get(0), args.Error(1)
+}
+
+func (m *MockFileUploader) DeleteFile(filePath string) error {
+	args := m.Called(filePath)
+	return args.Error(0)
+}
+
+func (m *MockFileUploader) GetFileInfo(filePath string) (interface{}, error) {
+	args := m.Called(filePath)
+	return args.Get(0), args.Error(1)
 }

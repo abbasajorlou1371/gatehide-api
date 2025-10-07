@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/gatehide/gatehide-api/config"
@@ -95,4 +96,11 @@ func (j *JWTManager) RefreshToken(tokenString string, rememberMe bool) (string, 
 	// For testing, always generate a new token
 	// In production, you might want to check if token is close to expiration
 	return j.GenerateToken(claims.UserID, claims.UserType, claims.Email, claims.Name, rememberMe)
+}
+
+// GenerateVerificationCode generates a 6-digit verification code
+func GenerateVerificationCode() string {
+	rand.Seed(time.Now().UnixNano())
+	code := rand.Intn(900000) + 100000 // Generate number between 100000 and 999999
+	return fmt.Sprintf("%06d", code)
 }

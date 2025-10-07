@@ -13,6 +13,8 @@ type UserRepository interface {
 	GetByID(id int) (*models.User, error)
 	UpdateLastLogin(id int) error
 	UpdatePassword(id int, hashedPassword string) error
+	UpdateProfile(id int, name, mobile, image string) error
+	UpdateEmail(id int, email string) error
 }
 
 // AdminRepository defines the interface for admin data operations
@@ -21,6 +23,8 @@ type AdminRepository interface {
 	GetByID(id int) (*models.Admin, error)
 	UpdateLastLogin(id int) error
 	UpdatePassword(id int, hashedPassword string) error
+	UpdateProfile(id int, name, mobile, image string) error
+	UpdateEmail(id int, email string) error
 }
 
 // userRepository implements UserRepository interface
@@ -129,6 +133,30 @@ func (r *userRepository) UpdatePassword(id int, hashedPassword string) error {
 	return nil
 }
 
+// UpdateProfile updates a user's profile information
+func (r *userRepository) UpdateProfile(id int, name, mobile, image string) error {
+	query := `UPDATE users SET name = ?, mobile = ?, image = ?, updated_at = NOW() WHERE id = ?`
+
+	_, err := r.db.Exec(query, name, mobile, image, id)
+	if err != nil {
+		return fmt.Errorf("failed to update profile: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateEmail updates a user's email
+func (r *userRepository) UpdateEmail(id int, email string) error {
+	query := `UPDATE users SET email = ?, updated_at = NOW() WHERE id = ?`
+
+	_, err := r.db.Exec(query, email, id)
+	if err != nil {
+		return fmt.Errorf("failed to update email: %w", err)
+	}
+
+	return nil
+}
+
 // GetByEmail retrieves an admin by email
 func (r *adminRepository) GetByEmail(email string) (*models.Admin, error) {
 	query := `
@@ -210,6 +238,30 @@ func (r *adminRepository) UpdatePassword(id int, hashedPassword string) error {
 	_, err := r.db.Exec(query, hashedPassword, id)
 	if err != nil {
 		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateProfile updates an admin's profile information
+func (r *adminRepository) UpdateProfile(id int, name, mobile, image string) error {
+	query := `UPDATE admins SET name = ?, mobile = ?, image = ?, updated_at = NOW() WHERE id = ?`
+
+	_, err := r.db.Exec(query, name, mobile, image, id)
+	if err != nil {
+		return fmt.Errorf("failed to update profile: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateEmail updates an admin's email
+func (r *adminRepository) UpdateEmail(id int, email string) error {
+	query := `UPDATE admins SET email = ?, updated_at = NOW() WHERE id = ?`
+
+	_, err := r.db.Exec(query, email, id)
+	if err != nil {
+		return fmt.Errorf("failed to update email: %w", err)
 	}
 
 	return nil

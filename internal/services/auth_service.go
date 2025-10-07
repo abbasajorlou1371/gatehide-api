@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"time"
@@ -15,13 +16,14 @@ import (
 
 // AuthService handles authentication business logic
 type AuthService struct {
-	userRepo            repositories.UserRepository
-	adminRepo           repositories.AdminRepository
-	passwordResetRepo   repositories.PasswordResetRepositoryInterface
-	sessionRepo         repositories.SessionRepositoryInterface
-	notificationService NotificationServiceInterface
-	jwtManager          *utils.JWTManager
-	config              *config.Config
+	userRepo              repositories.UserRepository
+	adminRepo             repositories.AdminRepository
+	passwordResetRepo     repositories.PasswordResetRepositoryInterface
+	sessionRepo           repositories.SessionRepositoryInterface
+	emailVerificationRepo *repositories.EmailVerificationRepository
+	notificationService   NotificationServiceInterface
+	jwtManager            *utils.JWTManager
+	config                *config.Config
 }
 
 // NewAuthService creates a new authentication service
@@ -30,17 +32,19 @@ func NewAuthService(
 	adminRepo repositories.AdminRepository,
 	passwordResetRepo repositories.PasswordResetRepositoryInterface,
 	sessionRepo repositories.SessionRepositoryInterface,
+	emailVerificationRepo *repositories.EmailVerificationRepository,
 	notificationService NotificationServiceInterface,
 	cfg *config.Config,
 ) *AuthService {
 	return &AuthService{
-		userRepo:            userRepo,
-		adminRepo:           adminRepo,
-		passwordResetRepo:   passwordResetRepo,
-		sessionRepo:         sessionRepo,
-		notificationService: notificationService,
-		jwtManager:          utils.NewJWTManager(cfg),
-		config:              cfg,
+		userRepo:              userRepo,
+		adminRepo:             adminRepo,
+		passwordResetRepo:     passwordResetRepo,
+		sessionRepo:           sessionRepo,
+		emailVerificationRepo: emailVerificationRepo,
+		notificationService:   notificationService,
+		jwtManager:            utils.NewJWTManager(cfg),
+		config:                cfg,
 	}
 }
 
@@ -166,6 +170,104 @@ func (s *AuthService) GetUserFromToken(tokenString string) (*utils.JWTClaims, er
 	}
 
 	return claims, nil
+}
+
+// GetUserByID retrieves a user by ID
+func (s *AuthService) GetUserByID(userID int) (*models.User, error) {
+	return s.userRepo.GetByID(userID)
+}
+
+// GetAdminByID retrieves an admin by ID
+func (s *AuthService) GetAdminByID(adminID int) (*models.Admin, error) {
+	return s.adminRepo.GetByID(adminID)
+}
+
+// UpdateUserProfile updates a user's profile
+func (s *AuthService) UpdateUserProfile(userID int, name, mobile, image string) (*models.UserResponse, error) {
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("user not found: %w", err)
+	}
+
+	// Update fields
+	user.Name = name
+	user.Mobile = mobile
+	if image != "" {
+		user.Image = &image
+	}
+
+	// Save to database
+	err = s.userRepo.UpdateProfile(userID, name, mobile, image)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update user profile: %w", err)
+	}
+
+	response := user.ToResponse()
+	return &response, nil
+}
+
+// UpdateAdminProfile updates an admin's profile
+func (s *AuthService) UpdateAdminProfile(adminID int, name, mobile, image string) (*models.AdminResponse, error) {
+	admin, err := s.adminRepo.GetByID(adminID)
+	if err != nil {
+		return nil, fmt.Errorf("admin not found: %w", err)
+	}
+
+	// Update fields
+	admin.Name = name
+	admin.Mobile = mobile
+	if image != "" {
+		admin.Image = &image
+	}
+
+	// Save to database
+	err = s.adminRepo.UpdateProfile(adminID, name, mobile, image)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update admin profile: %w", err)
+	}
+
+	response := admin.ToResponse()
+	return &response, nil
+}
+
+// UpdateUserEmail updates a user's email
+func (s *AuthService) UpdateUserEmail(userID int, newEmail string) (*models.UserResponse, error) {
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("user not found: %w", err)
+	}
+
+	// Update email
+	user.Email = newEmail
+
+	// Save to database
+	err = s.userRepo.UpdateEmail(userID, newEmail)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update user email: %w", err)
+	}
+
+	response := user.ToResponse()
+	return &response, nil
+}
+
+// UpdateAdminEmail updates an admin's email
+func (s *AuthService) UpdateAdminEmail(adminID int, newEmail string) (*models.AdminResponse, error) {
+	admin, err := s.adminRepo.GetByID(adminID)
+	if err != nil {
+		return nil, fmt.Errorf("admin not found: %w", err)
+	}
+
+	// Update email
+	admin.Email = newEmail
+
+	// Save to database
+	err = s.adminRepo.UpdateEmail(adminID, newEmail)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update admin email: %w", err)
+	}
+
+	response := admin.ToResponse()
+	return &response, nil
 }
 
 // GetJWTManager returns the JWT manager instance
@@ -405,6 +507,94 @@ func (s *AuthService) ChangePassword(userID int, userType, currentPassword, newP
 	return nil
 }
 
+// SendEmailVerification sends an email verification code for email change
+func (s *AuthService) SendEmailVerification(userID int, userType, newEmail string) (string, error) {
+	if s.notificationService == nil {
+		return "", fmt.Errorf("notification service not available")
+	}
+
+	// Generate verification code
+	verificationCode := utils.GenerateVerificationCode()
+
+	// Store verification code in database with 10-minute expiration
+	expiresAt := time.Now().Add(10 * time.Minute)
+	if err := s.emailVerificationRepo.StoreCode(userID, userType, newEmail, verificationCode, expiresAt); err != nil {
+		return "", fmt.Errorf("failed to store verification code: %w", err)
+	}
+
+	// Get user information for personalization
+	var userName string
+	var currentEmail string
+
+	if userType == "admin" {
+		admin, err := s.adminRepo.GetByID(userID)
+		if err != nil {
+			return "", fmt.Errorf("failed to get admin information: %w", err)
+		}
+		userName = admin.Name
+		currentEmail = admin.Email
+	} else {
+		user, err := s.userRepo.GetByID(userID)
+		if err != nil {
+			return "", fmt.Errorf("failed to get user information: %w", err)
+		}
+		userName = user.Name
+		currentEmail = user.Email
+	}
+
+	unsubscribeLink := "http://localhost:3000/unsubscribe?email=" + newEmail
+	supportLink := "http://localhost:3000/support"
+
+	// Create email content
+	subject := fmt.Sprintf("تأیید تغییر ایمیل - %s", s.config.App.Name)
+	content := fmt.Sprintf(`%s عزیز،
+
+درخواست تغییر ایمیل برای حساب کاربری شما در %s دریافت شده است.
+
+ایمیل فعلی: %s
+ایمیل جدید: %s
+
+کد تأیید شما: %s
+
+لطفاً این کد را در صفحه تنظیمات وارد کنید تا تغییر ایمیل تکمیل شود.
+
+اگر شما این درخواست را انجام نداده‌اید، لطفاً فوراً با تیم پشتیبانی تماس بگیرید.
+
+با احترام،
+تیم %s`, userName, s.config.App.Name, currentEmail, newEmail, verificationCode, s.config.App.Name)
+
+	// Create notification request
+	notification := &models.CreateNotificationRequest{
+		Type:      models.NotificationTypeEmail,
+		Priority:  models.NotificationPriorityHigh,
+		Recipient: newEmail,
+		Subject:   subject,
+		Content:   content,
+		TemplateData: map[string]interface{}{
+			"app_name":          s.config.App.Name,
+			"user_name":         userName,
+			"current_email":     currentEmail,
+			"new_email":         newEmail,
+			"verification_code": verificationCode,
+			"unsubscribe_link":  unsubscribeLink,
+			"support_link":      supportLink,
+		},
+	}
+
+	// Send the notification
+	ctx := context.Background()
+	if err := s.notificationService.SendNotification(ctx, notification); err != nil {
+		return "", fmt.Errorf("failed to send verification email: %w", err)
+	}
+
+	return verificationCode, nil
+}
+
+// VerifyEmailCode verifies an email verification code
+func (s *AuthService) VerifyEmailCode(userID int, userType, email, code string) (bool, error) {
+	return s.emailVerificationRepo.VerifyCode(userID, userType, email, code)
+}
+
 // sendPasswordResetEmail sends a password reset email using the notification service
 func (s *AuthService) sendPasswordResetEmail(email, name, token string) error {
 	if s.notificationService == nil {
@@ -477,4 +667,28 @@ func (s *AuthService) sendPasswordChangeNotification(email, userType string) err
 	// Send the notification
 	ctx := context.Background()
 	return s.notificationService.SendNotification(ctx, notification)
+}
+
+// CheckEmailExists checks if an email already exists in the system (users or admins)
+func (s *AuthService) CheckEmailExists(email string) (bool, error) {
+	// Check if email exists in users table
+	_, err := s.userRepo.GetByEmail(email)
+	if err == nil {
+		return true, nil // Email exists in users table
+	}
+	if err != sql.ErrNoRows {
+		return false, fmt.Errorf("failed to check user email: %w", err)
+	}
+
+	// Check if email exists in admins table
+	_, err = s.adminRepo.GetByEmail(email)
+	if err == nil {
+		return true, nil // Email exists in admins table
+	}
+	if err != sql.ErrNoRows {
+		return false, fmt.Errorf("failed to check admin email: %w", err)
+	}
+
+	// Email doesn't exist in either table
+	return false, nil
 }

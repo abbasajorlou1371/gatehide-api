@@ -5,7 +5,6 @@ import (
 
 	"github.com/gatehide/gatehide-api/internal/repositories"
 	"github.com/gatehide/gatehide-api/internal/services"
-	"github.com/gatehide/gatehide-api/tests/utils"
 	testutils "github.com/gatehide/gatehide-api/tests/utils"
 )
 
@@ -24,8 +23,9 @@ func TestAuthService_LoginUser(t *testing.T) {
 	passwordResetRepo := repositories.NewPasswordResetRepository(db)
 	cfg := testutils.TestConfig()
 	sessionRepo := repositories.NewSessionRepository(db)
-	notificationService := &utils.MockNotificationService{}
-	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, notificationService, cfg)
+	emailVerificationRepo := repositories.NewEmailVerificationRepository(db)
+	notificationService := &testutils.MockNotificationService{}
+	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 
 	// Create a test user with unique email
 	_ = testutils.CreateTestUser(t, db, "user1@example.com", "password123", "Test User 1")
@@ -110,8 +110,9 @@ func TestAuthService_LoginAdmin(t *testing.T) {
 	passwordResetRepo := repositories.NewPasswordResetRepository(db)
 	cfg := testutils.TestConfig()
 	sessionRepo := repositories.NewSessionRepository(db)
-	notificationService := &utils.MockNotificationService{}
-	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, notificationService, cfg)
+	emailVerificationRepo := repositories.NewEmailVerificationRepository(db)
+	notificationService := &testutils.MockNotificationService{}
+	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 
 	// Create a test admin with unique email
 	_ = testutils.CreateTestAdmin(t, db, "admin1@example.com", "admin123", "Test Admin 1")
@@ -196,8 +197,9 @@ func TestAuthService_Login_Unified(t *testing.T) {
 	passwordResetRepo := repositories.NewPasswordResetRepository(db)
 	cfg := testutils.TestConfig()
 	sessionRepo := repositories.NewSessionRepository(db)
-	notificationService := &utils.MockNotificationService{}
-	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, notificationService, cfg)
+	emailVerificationRepo := repositories.NewEmailVerificationRepository(db)
+	notificationService := &testutils.MockNotificationService{}
+	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 
 	// Create test user and admin with unique emails
 	user := testutils.CreateTestUser(t, db, "user2@example.com", "password123", "Test User 2")
@@ -292,8 +294,9 @@ func TestAuthService_ValidateToken(t *testing.T) {
 	passwordResetRepo := repositories.NewPasswordResetRepository(db)
 	cfg := testutils.TestConfig()
 	sessionRepo := repositories.NewSessionRepository(db)
-	notificationService := &utils.MockNotificationService{}
-	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, notificationService, cfg)
+	emailVerificationRepo := repositories.NewEmailVerificationRepository(db)
+	notificationService := &testutils.MockNotificationService{}
+	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 
 	// Create a test user and get a valid token
 	testUser := testutils.CreateTestUser(t, db, "user3@example.com", "password123", "Test User 3")
@@ -362,8 +365,9 @@ func TestAuthService_RefreshToken(t *testing.T) {
 	passwordResetRepo := repositories.NewPasswordResetRepository(db)
 	cfg := testutils.TestConfig()
 	sessionRepo := repositories.NewSessionRepository(db)
-	notificationService := &utils.MockNotificationService{}
-	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, notificationService, cfg)
+	emailVerificationRepo := repositories.NewEmailVerificationRepository(db)
+	notificationService := &testutils.MockNotificationService{}
+	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 
 	// Create a test user and get a valid token
 	testUser := testutils.CreateTestUser(t, db, "user4@example.com", "password123", "Test User 4")
@@ -428,8 +432,9 @@ func TestAuthService_GetUserFromToken(t *testing.T) {
 	passwordResetRepo := repositories.NewPasswordResetRepository(db)
 	cfg := testutils.TestConfig()
 	sessionRepo := repositories.NewSessionRepository(db)
-	notificationService := &utils.MockNotificationService{}
-	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, notificationService, cfg)
+	emailVerificationRepo := repositories.NewEmailVerificationRepository(db)
+	notificationService := &testutils.MockNotificationService{}
+	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 
 	// Create a test user and get a valid token
 	testUser := testutils.CreateTestUser(t, db, "user5@example.com", "password123", "Test User 5")
@@ -493,8 +498,9 @@ func TestAuthService_UserTypeDetection(t *testing.T) {
 	passwordResetRepo := repositories.NewPasswordResetRepository(db)
 	cfg := testutils.TestConfig()
 	sessionRepo := repositories.NewSessionRepository(db)
-	notificationService := &utils.MockNotificationService{}
-	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, notificationService, cfg)
+	emailVerificationRepo := repositories.NewEmailVerificationRepository(db)
+	notificationService := &testutils.MockNotificationService{}
+	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 
 	// Create test user and admin with unique emails
 	_ = testutils.CreateTestUser(t, db, "user6@example.com", "password123", "Test User 6")

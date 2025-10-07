@@ -28,6 +28,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	adminRepo := repositories.NewAdminRepository(db)
 	passwordResetRepo := repositories.NewPasswordResetRepository(db)
 	sessionRepo := repositories.NewSessionRepository(db)
+	emailVerificationRepo := repositories.NewEmailVerificationRepository(db)
 	notificationRepo := repositories.NewMySQLNotificationRepository(db)
 	gamenetRepo := repositories.NewGamenetRepository(db)
 
@@ -36,7 +37,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	smsService := services.NewSMSService(&cfg.Notification.SMS)
 	notificationService := services.NewNotificationService(
 		emailService, smsService, nil, nil, notificationRepo, cfg)
-	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, notificationService, cfg)
+	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 	sessionService := services.NewSessionService(sessionRepo, cfg)
 	gamenetService := services.NewGamenetService(gamenetRepo)
 
@@ -45,7 +46,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(cfg)
-	authHandler := handlers.NewAuthHandler(authService)
+	authHandler := handlers.NewAuthHandler(authService, fileUploader)
 	sessionHandler := handlers.NewSessionHandler(sessionService)
 	notificationHandler := handlers.NewNotificationHandler(
 		notificationService, nil, nil, authService.GetJWTManager())
@@ -81,7 +82,11 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 		{
 			// User profile routes (accessible by both users and admins)
 			protected.GET("/profile", authHandler.GetProfile)
+			protected.PUT("/profile", authHandler.UpdateProfile)
+			protected.POST("/profile/upload-image", authHandler.UploadProfileImage)
 			protected.POST("/change-password", authHandler.ChangePassword)
+			protected.POST("/send-email-verification", authHandler.SendEmailVerification)
+			protected.POST("/verify-email-code", authHandler.VerifyEmailCode)
 
 			// Session management routes
 			sessions := protected.Group("/sessions")

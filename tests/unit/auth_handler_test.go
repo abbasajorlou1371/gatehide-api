@@ -82,8 +82,12 @@ func TestAuthHandler_Login(t *testing.T) {
 			mockService := new(testutils.MockAuthService)
 			tt.mockSetup(mockService)
 
+			// Setup file uploader
+			cfg := testutils.TestConfig()
+			fileUploader := utils.NewFileUploader(&cfg.FileStorage)
+
 			// Setup handler
-			handler := handlers.NewAuthHandler(mockService)
+			handler := handlers.NewAuthHandler(mockService, fileUploader)
 
 			// Setup request
 			jsonBody, _ := json.Marshal(tt.requestBody)
@@ -170,8 +174,12 @@ func TestAuthHandler_RefreshToken(t *testing.T) {
 			mockService := new(testutils.MockAuthService)
 			tt.mockSetup(mockService)
 
+			// Setup file uploader
+			cfg := testutils.TestConfig()
+			fileUploader := utils.NewFileUploader(&cfg.FileStorage)
+
 			// Setup handler
-			handler := handlers.NewAuthHandler(mockService)
+			handler := handlers.NewAuthHandler(mockService, fileUploader)
 
 			// Setup request
 			req := httptest.NewRequest("POST", "/auth/refresh", nil)
@@ -219,7 +227,9 @@ func TestAuthHandler_Logout(t *testing.T) {
 		Email:    "test@example.com",
 		Name:     "Test User",
 	}, nil)
-	handler := handlers.NewAuthHandler(mockService)
+	cfg := testutils.TestConfig()
+	fileUploader := utils.NewFileUploader(&cfg.FileStorage)
+	handler := handlers.NewAuthHandler(mockService, fileUploader)
 
 	// Setup request
 	req := httptest.NewRequest("POST", "/auth/logout", nil)
@@ -280,7 +290,20 @@ func TestAuthHandler_GetProfile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup handler
 			mockService := new(testutils.MockAuthService)
-			handler := handlers.NewAuthHandler(mockService)
+
+			// Setup mock expectations for valid user case
+			if tt.name == "valid user in context" {
+				mockUser := &models.User{
+					ID:    1,
+					Name:  "Test User",
+					Email: "user@example.com",
+				}
+				mockService.On("GetUserByID", 1).Return(mockUser, nil)
+			}
+
+			cfg := testutils.TestConfig()
+			fileUploader := utils.NewFileUploader(&cfg.FileStorage)
+			handler := handlers.NewAuthHandler(mockService, fileUploader)
 
 			// Setup request
 			req := httptest.NewRequest("GET", "/profile", nil)

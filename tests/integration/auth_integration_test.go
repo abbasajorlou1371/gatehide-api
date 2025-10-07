@@ -15,26 +15,27 @@ import (
 	"github.com/gatehide/gatehide-api/internal/models"
 	"github.com/gatehide/gatehide-api/internal/repositories"
 	"github.com/gatehide/gatehide-api/internal/services"
-	"github.com/gatehide/gatehide-api/tests/utils"
+	"github.com/gatehide/gatehide-api/internal/utils"
+	testutils "github.com/gatehide/gatehide-api/tests/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAuthenticationIntegration_UserLogin(t *testing.T) {
-	utils.SkipIfNoDB(t)
+	testutils.SkipIfNoDB(t)
 
-	db := utils.SetupTestDB(t)
+	db := testutils.SetupTestDB(t)
 	defer db.Close()
-	defer utils.CleanupTestDBForce(t, db)
+	defer testutils.CleanupTestDBForce(t, db)
 
 	// Clean up any existing test data before starting
-	utils.CleanupTestDBForce(t, db)
+	testutils.CleanupTestDBForce(t, db)
 
 	// Setup test data with unique email
-	testUser := utils.CreateTestUser(t, db, "user1@example.com", "password123", "Test User 1")
+	testUser := testutils.CreateTestUser(t, db, "user1@example.com", "password123", "Test User 1")
 
 	// Setup application
-	cfg := utils.TestConfig()
+	cfg := testutils.TestConfig()
 	router := setupTestRouter(cfg, db)
 
 	tests := []struct {
@@ -113,17 +114,17 @@ func TestAuthenticationIntegration_UserLogin(t *testing.T) {
 }
 
 func TestAuthenticationIntegration_AdminLogin(t *testing.T) {
-	utils.SkipIfNoDB(t)
+	testutils.SkipIfNoDB(t)
 
-	db := utils.SetupTestDB(t)
+	db := testutils.SetupTestDB(t)
 	defer db.Close()
-	defer utils.CleanupTestDBForce(t, db)
+	defer testutils.CleanupTestDBForce(t, db)
 
 	// Setup test data with unique email
-	testAdmin := utils.CreateTestAdmin(t, db, "admin1@example.com", "admin123", "Test Admin 1")
+	testAdmin := testutils.CreateTestAdmin(t, db, "admin1@example.com", "admin123", "Test Admin 1")
 
 	// Setup application
-	cfg := utils.TestConfig()
+	cfg := testutils.TestConfig()
 	router := setupTestRouter(cfg, db)
 
 	tests := []struct {
@@ -193,18 +194,18 @@ func TestAuthenticationIntegration_AdminLogin(t *testing.T) {
 }
 
 func TestAuthenticationIntegration_ProtectedRoutes(t *testing.T) {
-	utils.SkipIfNoDB(t)
+	testutils.SkipIfNoDB(t)
 
-	db := utils.SetupTestDB(t)
+	db := testutils.SetupTestDB(t)
 	defer db.Close()
-	defer utils.CleanupTestDBForce(t, db)
+	defer testutils.CleanupTestDBForce(t, db)
 
 	// Setup test data with unique emails
-	_ = utils.CreateTestUser(t, db, "user2@example.com", "password123", "Test User 2")
-	_ = utils.CreateTestAdmin(t, db, "admin2@example.com", "admin123", "Test Admin 2")
+	_ = testutils.CreateTestUser(t, db, "user2@example.com", "password123", "Test User 2")
+	_ = testutils.CreateTestAdmin(t, db, "admin2@example.com", "admin123", "Test Admin 2")
 
 	// Setup application
-	cfg := utils.TestConfig()
+	cfg := testutils.TestConfig()
 	router := setupTestRouter(cfg, db)
 
 	// Get tokens for testing
@@ -285,17 +286,17 @@ func TestAuthenticationIntegration_ProtectedRoutes(t *testing.T) {
 }
 
 func TestAuthenticationIntegration_TokenRefresh(t *testing.T) {
-	utils.SkipIfNoDB(t)
+	testutils.SkipIfNoDB(t)
 
-	db := utils.SetupTestDB(t)
+	db := testutils.SetupTestDB(t)
 	defer db.Close()
-	defer utils.CleanupTestDBForce(t, db)
+	defer testutils.CleanupTestDBForce(t, db)
 
 	// Setup test data with unique email
-	_ = utils.CreateTestUser(t, db, "user3@example.com", "password123", "Test User 3")
+	_ = testutils.CreateTestUser(t, db, "user3@example.com", "password123", "Test User 3")
 
 	// Setup application
-	cfg := utils.TestConfig()
+	cfg := testutils.TestConfig()
 	router := setupTestRouter(cfg, db)
 
 	// Get initial token
@@ -370,15 +371,15 @@ func TestAuthenticationIntegration_TokenRefresh(t *testing.T) {
 }
 
 func TestAuthenticationIntegration_Logout(t *testing.T) {
-	utils.SkipIfNoDB(t)
+	testutils.SkipIfNoDB(t)
 
-	cfg := utils.TestConfig()
-	db := utils.SetupTestDB(t)
+	cfg := testutils.TestConfig()
+	db := testutils.SetupTestDB(t)
 	defer db.Close()
-	defer utils.CleanupTestDBForce(t, db)
+	defer testutils.CleanupTestDBForce(t, db)
 
 	// Setup test data
-	_ = utils.CreateTestUser(t, db, "logout@example.com", "password123", "Logout Test User")
+	_ = testutils.CreateTestUser(t, db, "logout@example.com", "password123", "Logout Test User")
 
 	router := setupTestRouter(cfg, db)
 
@@ -427,14 +428,18 @@ func setupTestRouter(cfg *config.Config, db *sql.DB) *gin.Engine {
 	adminRepo := repositories.NewAdminRepository(db)
 	passwordResetRepo := repositories.NewPasswordResetRepository(db)
 	sessionRepo := repositories.NewSessionRepository(db)
-	notificationService := &utils.MockNotificationService{}
+	emailVerificationRepo := repositories.NewEmailVerificationRepository(db)
+	notificationService := &testutils.MockNotificationService{}
+
+	// Initialize file uploader
+	fileUploader := utils.NewFileUploader(&cfg.FileStorage)
 
 	// Initialize services
-	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, notificationService, cfg)
+	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(cfg)
-	authHandler := handlers.NewAuthHandler(authService)
+	authHandler := handlers.NewAuthHandler(authService, fileUploader)
 
 	// Setup routes
 	v1 := router.Group("/api/v1")
