@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gatehide/gatehide-api/internal/models"
 	"github.com/gatehide/gatehide-api/internal/services"
@@ -172,7 +173,7 @@ func (h *SubscriptionPlanHandler) DeletePlan(c *gin.Context) {
 		}
 
 		// Check if it's a not found error
-		if err.Error() == "subscription plan not found" {
+		if err.Error() == "subscription plan not found" || strings.Contains(err.Error(), "subscription plan not found") {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error":   "Plan not found",
 				"details": err.Error(),

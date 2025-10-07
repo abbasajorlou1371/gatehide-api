@@ -7,6 +7,17 @@ import (
 	"github.com/gatehide/gatehide-api/internal/models"
 )
 
+// SubscriptionPlanRepositoryInterface defines the interface for subscription plan repository operations
+type SubscriptionPlanRepositoryInterface interface {
+	Create(plan *models.SubscriptionPlan) error
+	GetByID(id int) (*models.SubscriptionPlan, error)
+	GetAll(limit, offset int, isActive *bool) ([]*models.SubscriptionPlan, error)
+	Update(id int, plan *models.SubscriptionPlan) error
+	Delete(id int) error
+	Count(isActive *bool) (int, error)
+	HasActiveSubscriptions(planID int) (bool, error)
+}
+
 // SubscriptionPlanRepository handles subscription plan database operations
 type SubscriptionPlanRepository struct {
 	db *sql.DB

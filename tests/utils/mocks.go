@@ -382,3 +382,93 @@ func (m *MockFileUploader) GetFileInfo(filePath string) (interface{}, error) {
 	args := m.Called(filePath)
 	return args.Get(0), args.Error(1)
 }
+
+// MockSubscriptionPlanRepository is a mock implementation of SubscriptionPlanRepositoryInterface
+type MockSubscriptionPlanRepository struct {
+	mock.Mock
+}
+
+func (m *MockSubscriptionPlanRepository) Create(plan *models.SubscriptionPlan) error {
+	args := m.Called(plan)
+	return args.Error(0)
+}
+
+func (m *MockSubscriptionPlanRepository) GetByID(id int) (*models.SubscriptionPlan, error) {
+	args := m.Called(id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.SubscriptionPlan), args.Error(1)
+}
+
+func (m *MockSubscriptionPlanRepository) GetAll(limit, offset int, isActive *bool) ([]*models.SubscriptionPlan, error) {
+	args := m.Called(limit, offset, isActive)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.SubscriptionPlan), args.Error(1)
+}
+
+func (m *MockSubscriptionPlanRepository) Update(id int, plan *models.SubscriptionPlan) error {
+	args := m.Called(id, plan)
+	return args.Error(0)
+}
+
+func (m *MockSubscriptionPlanRepository) Delete(id int) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
+
+func (m *MockSubscriptionPlanRepository) Count(isActive *bool) (int, error) {
+	args := m.Called(isActive)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *MockSubscriptionPlanRepository) HasActiveSubscriptions(planID int) (bool, error) {
+	args := m.Called(planID)
+	return args.Bool(0), args.Error(1)
+}
+
+// CreateMockSubscriptionPlan creates a mock subscription plan for testing
+func CreateMockSubscriptionPlan(id int, name, planType string, price float64) *models.SubscriptionPlan {
+	now := time.Now()
+	return &models.SubscriptionPlan{
+		ID:                       id,
+		Name:                     name,
+		PlanType:                 planType,
+		Price:                    price,
+		AnnualDiscountPercentage: nil,
+		TrialDurationDays:        nil,
+		IsActive:                 true,
+		SubscriptionCount:        0,
+		CreatedAt:                now,
+		UpdatedAt:                now,
+	}
+}
+
+// CreateMockPlanResponse creates a mock plan response for testing
+func CreateMockPlanResponse(id int, name, planType string, price float64) *models.PlanResponse {
+	now := time.Now()
+	return &models.PlanResponse{
+		ID:                       id,
+		Name:                     name,
+		PlanType:                 planType,
+		Price:                    price,
+		AnnualDiscountPercentage: nil,
+		TrialDurationDays:        nil,
+		IsActive:                 true,
+		CreatedAt:                now,
+		UpdatedAt:                now,
+	}
+}
+
+// SetupMockSubscriptionPlanRepository sets up a mock subscription plan repository
+func SetupMockSubscriptionPlanRepository(t *testing.T) *MockSubscriptionPlanRepository {
+	mockRepo := new(MockSubscriptionPlanRepository)
+	return mockRepo
+}
+
+// AssertSubscriptionPlanRepositoryExpectations asserts all expectations on the mock repository
+func AssertSubscriptionPlanRepositoryExpectations(t *testing.T, mockRepo *MockSubscriptionPlanRepository) {
+	mockRepo.AssertExpectations(t)
+}

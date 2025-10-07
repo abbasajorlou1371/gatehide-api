@@ -79,6 +79,7 @@ func CleanupTestDB(t *testing.T, db *sql.DB) {
 
 	// Clean up test data in reverse order to avoid foreign key constraints
 	queries := []string{
+		"DELETE FROM user_sessions",
 		"DELETE FROM users",
 		"DELETE FROM admins",
 		"DELETE FROM migrations",
@@ -101,9 +102,11 @@ func CleanupTestDBForce(t *testing.T, db *sql.DB) {
 
 	// Clean up test data and reset auto-increment
 	queries := []string{
+		"DELETE FROM user_sessions",
 		"DELETE FROM users",
 		"DELETE FROM admins",
 		"DELETE FROM migrations",
+		"ALTER TABLE user_sessions AUTO_INCREMENT = 1",
 		"ALTER TABLE users AUTO_INCREMENT = 1",
 		"ALTER TABLE admins AUTO_INCREMENT = 1",
 		"ALTER TABLE migrations AUTO_INCREMENT = 1",
@@ -244,6 +247,34 @@ func runTestMigrations(db *sql.DB) error {
 
 	if _, err := db.Exec(adminsTable); err != nil {
 		return fmt.Errorf("failed to create admins table: %w", err)
+	}
+
+	// Create user_sessions table
+	userSessionsTable := `
+		CREATE TABLE IF NOT EXISTS user_sessions (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			user_id INT NOT NULL,
+			user_type ENUM('user', 'admin') NOT NULL,
+			session_token VARCHAR(500) NOT NULL UNIQUE,
+			device_info TEXT NULL,
+			ip_address VARCHAR(45) NULL,
+			user_agent TEXT NULL,
+			is_active BOOLEAN DEFAULT TRUE,
+			last_activity_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			expires_at TIMESTAMP NOT NULL,
+			
+			INDEX idx_user_id (user_id),
+			INDEX idx_user_type (user_type),
+			INDEX idx_session_token (session_token),
+			INDEX idx_is_active (is_active),
+			INDEX idx_expires_at (expires_at),
+			INDEX idx_last_activity (last_activity_at)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+	`
+
+	if _, err := db.Exec(userSessionsTable); err != nil {
+		return fmt.Errorf("failed to create user_sessions table: %w", err)
 	}
 
 	return nil

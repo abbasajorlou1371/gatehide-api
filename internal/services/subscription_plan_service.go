@@ -18,11 +18,11 @@ type SubscriptionPlanServiceInterface interface {
 
 // SubscriptionPlanService handles subscription plan business logic
 type SubscriptionPlanService struct {
-	repo *repositories.SubscriptionPlanRepository
+	repo repositories.SubscriptionPlanRepositoryInterface
 }
 
 // NewSubscriptionPlanService creates a new subscription plan service
-func NewSubscriptionPlanService(repo *repositories.SubscriptionPlanRepository) *SubscriptionPlanService {
+func NewSubscriptionPlanService(repo repositories.SubscriptionPlanRepositoryInterface) *SubscriptionPlanService {
 	return &SubscriptionPlanService{repo: repo}
 }
 
