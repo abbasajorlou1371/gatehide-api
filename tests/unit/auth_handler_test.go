@@ -39,7 +39,7 @@ func TestAuthHandler_Login(t *testing.T) {
 					User:      models.UserResponse{ID: 1, Email: "user@example.com", Name: "Test User"},
 					ExpiresAt: time.Now().Add(24 * time.Hour),
 				}
-				m.On("Login", "user@example.com", "password123", false).Return(response, nil)
+				m.On("LoginWithSession", "user@example.com", "password123", false, "", "192.0.2.1", "").Return(response, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedError:  false,
@@ -57,7 +57,7 @@ func TestAuthHandler_Login(t *testing.T) {
 					User:      models.AdminResponse{ID: 1, Email: "admin@example.com", Name: "Test Admin"},
 					ExpiresAt: time.Now().Add(24 * time.Hour),
 				}
-				m.On("Login", "admin@example.com", "admin123", false).Return(response, nil)
+				m.On("LoginWithSession", "admin@example.com", "admin123", false, "", "192.0.2.1", "").Return(response, nil)
 			},
 			expectedStatus: http.StatusOK,
 			expectedError:  false,
@@ -69,7 +69,7 @@ func TestAuthHandler_Login(t *testing.T) {
 				Password: "wrongpassword",
 			},
 			mockSetup: func(m *testutils.MockAuthService) {
-				m.On("Login", "user@example.com", "wrongpassword", false).Return((*models.LoginResponse)(nil), assert.AnError)
+				m.On("LoginWithSession", "user@example.com", "wrongpassword", false, "", "192.0.2.1", "").Return((*models.LoginResponse)(nil), assert.AnError)
 			},
 			expectedStatus: http.StatusUnauthorized,
 			expectedError:  true,

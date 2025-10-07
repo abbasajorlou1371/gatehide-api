@@ -114,7 +114,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	response, err := h.authService.Login(req.Email, req.Password, req.RememberMe)
+	// Extract device information from request headers
+	deviceInfo := c.GetHeader("X-Device-Info")
+	ipAddress := c.ClientIP()
+	userAgent := c.GetHeader("User-Agent")
+
+	// Use LoginWithSession to create a session during login
+	response, err := h.authService.LoginWithSession(req.Email, req.Password, req.RememberMe, deviceInfo, ipAddress, userAgent)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": err.Error(),
@@ -237,5 +243,82 @@ func (h *AuthHandler) ValidateResetToken(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Token is valid",
+	})
+}
+
+// ChangePassword handles change password requests for authenticated users
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	var req models.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "داده‌های درخواست نامعتبر است",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Extract user information from context
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "شناسه کاربر یافت نشد",
+		})
+		return
+	}
+
+	userType, exists := c.Get("user_type")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "نوع کاربر یافت نشد",
+		})
+		return
+	}
+
+	// Call the service to change password
+	err := h.authService.ChangePassword(
+		userID.(int),
+		userType.(string),
+		req.CurrentPassword,
+		req.NewPassword,
+		req.ConfirmPassword,
+	)
+
+	if err != nil {
+		if err.Error() == "رمز عبور فعلی اشتباه است" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "رمز عبور فعلی اشتباه است",
+			})
+			return
+		}
+		if err.Error() == "رمز عبور جدید و تأیید رمز عبور مطابقت ندارند" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "رمز عبور جدید و تأیید رمز عبور مطابقت ندارند",
+			})
+			return
+		}
+		if err.Error() == "رمز عبور باید حداقل 6 کاراکتر باشد" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "رمز عبور باید حداقل 6 کاراکتر باشد",
+			})
+			return
+		}
+		if err.Error() == "کاربر یافت نشد" || err.Error() == "مدیر یافت نشد" {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "کاربر یافت نشد",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "خطا در تغییر رمز عبور",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "رمز عبور با موفقیت تغییر یافت",
+		"data": gin.H{
+			"user_id":   userID,
+			"user_type": userType,
+		},
 	})
 }

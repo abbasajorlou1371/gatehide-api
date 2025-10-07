@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -22,8 +23,21 @@ func (m *MockUserRepository) GetByEmail(email string) (*models.User, error) {
 	return args.Get(0).(*models.User), args.Error(1)
 }
 
+func (m *MockUserRepository) GetByID(id int) (*models.User, error) {
+	args := m.Called(id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.User), args.Error(1)
+}
+
 func (m *MockUserRepository) UpdateLastLogin(id int) error {
 	args := m.Called(id)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) UpdatePassword(id int, hashedPassword string) error {
+	args := m.Called(id, hashedPassword)
 	return args.Error(0)
 }
 
@@ -40,8 +54,21 @@ func (m *MockAdminRepository) GetByEmail(email string) (*models.Admin, error) {
 	return args.Get(0).(*models.Admin), args.Error(1)
 }
 
+func (m *MockAdminRepository) GetByID(id int) (*models.Admin, error) {
+	args := m.Called(id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Admin), args.Error(1)
+}
+
 func (m *MockAdminRepository) UpdateLastLogin(id int) error {
 	args := m.Called(id)
+	return args.Error(0)
+}
+
+func (m *MockAdminRepository) UpdatePassword(id int, hashedPassword string) error {
+	args := m.Called(id, hashedPassword)
 	return args.Error(0)
 }
 
@@ -153,5 +180,122 @@ func (m *MockAuthService) ResetPassword(token, email, newPassword, confirmPasswo
 
 func (m *MockAuthService) ValidateResetToken(token string) error {
 	args := m.Called(token)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) ChangePassword(userID int, userType, currentPassword, newPassword, confirmPassword string) error {
+	args := m.Called(userID, userType, currentPassword, newPassword, confirmPassword)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) LoginWithSession(email, password string, rememberMe bool, deviceInfo, ipAddress, userAgent string) (*models.LoginResponse, error) {
+	args := m.Called(email, password, rememberMe, deviceInfo, ipAddress, userAgent)
+	return args.Get(0).(*models.LoginResponse), args.Error(1)
+}
+
+// MockSessionRepository is a mock implementation of SessionRepositoryInterface
+type MockSessionRepository struct {
+	mock.Mock
+}
+
+func (m *MockSessionRepository) CreateSession(session *models.UserSession) error {
+	args := m.Called(session)
+	return args.Error(0)
+}
+
+func (m *MockSessionRepository) GetSessionByToken(token string) (*models.UserSession, error) {
+	args := m.Called(token)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.UserSession), args.Error(1)
+}
+
+func (m *MockSessionRepository) GetActiveSessionsByUserID(userID int, userType string) ([]models.UserSession, error) {
+	args := m.Called(userID, userType)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.UserSession), args.Error(1)
+}
+
+func (m *MockSessionRepository) DeactivateSession(sessionID int) error {
+	args := m.Called(sessionID)
+	return args.Error(0)
+}
+
+func (m *MockSessionRepository) DeactivateAllOtherUserSessions(userID int, userType string, currentSessionToken string) error {
+	args := m.Called(userID, userType, currentSessionToken)
+	return args.Error(0)
+}
+
+func (m *MockSessionRepository) DeactivateAllUserSessions(userID int, userType string) error {
+	args := m.Called(userID, userType)
+	return args.Error(0)
+}
+
+func (m *MockSessionRepository) UpdateSessionActivity(sessionID int) error {
+	args := m.Called(sessionID)
+	return args.Error(0)
+}
+
+func (m *MockSessionRepository) CleanupExpiredSessions() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *MockSessionRepository) DeleteSession(sessionID int) error {
+	args := m.Called(sessionID)
+	return args.Error(0)
+}
+
+// MockNotificationService is a mock implementation of NotificationServiceInterface
+type MockNotificationService struct {
+	mock.Mock
+}
+
+func (m *MockNotificationService) SendNotification(ctx context.Context, notification *models.CreateNotificationRequest) error {
+	args := m.Called(ctx, notification)
+	return args.Error(0)
+}
+
+func (m *MockNotificationService) SendEmail(ctx context.Context, email *models.SendEmailRequest) error {
+	args := m.Called(ctx, email)
+	return args.Error(0)
+}
+
+func (m *MockNotificationService) SendSMS(ctx context.Context, sms *models.SendSMSRequest) error {
+	args := m.Called(ctx, sms)
+	return args.Error(0)
+}
+
+func (m *MockNotificationService) SendDatabaseNotification(ctx context.Context, dbNotification *models.DatabaseNotification) error {
+	args := m.Called(ctx, dbNotification)
+	return args.Error(0)
+}
+
+func (m *MockNotificationService) GetNotification(ctx context.Context, id int) (*models.Notification, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Notification), args.Error(1)
+}
+
+func (m *MockNotificationService) GetNotifications(ctx context.Context, filters map[string]interface{}) ([]*models.Notification, error) {
+	args := m.Called(ctx, filters)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.Notification), args.Error(1)
+}
+
+func (m *MockNotificationService) UpdateNotificationStatus(ctx context.Context, id int, status models.NotificationStatus, errorMsg *string) error {
+	args := m.Called(ctx, id, status, errorMsg)
+	return args.Error(0)
+}
+
+func (m *MockNotificationService) RetryFailedNotification(ctx context.Context, id int) error {
+	args := m.Called(ctx, id)
 	return args.Error(0)
 }

@@ -10,6 +10,7 @@ import (
 // UserRepository defines the interface for user data operations
 type UserRepository interface {
 	GetByEmail(email string) (*models.User, error)
+	GetByID(id int) (*models.User, error)
 	UpdateLastLogin(id int) error
 	UpdatePassword(id int, hashedPassword string) error
 }
@@ -17,6 +18,7 @@ type UserRepository interface {
 // AdminRepository defines the interface for admin data operations
 type AdminRepository interface {
 	GetByEmail(email string) (*models.Admin, error)
+	GetByID(id int) (*models.Admin, error)
 	UpdateLastLogin(id int) error
 	UpdatePassword(id int, hashedPassword string) error
 }
@@ -72,6 +74,37 @@ func (r *userRepository) GetByEmail(email string) (*models.User, error) {
 	return user, nil
 }
 
+// GetByID retrieves a user by ID
+func (r *userRepository) GetByID(id int) (*models.User, error) {
+	query := `
+		SELECT id, name, mobile, email, password, image, last_login_at, created_at, updated_at
+		FROM users 
+		WHERE id = ?
+	`
+
+	user := &models.User{}
+	err := r.db.QueryRow(query, id).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Mobile,
+		&user.Email,
+		&user.Password,
+		&user.Image,
+		&user.LastLoginAt,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user not found")
+		}
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return user, nil
+}
+
 // UpdateLastLogin updates the last login timestamp for a user
 func (r *userRepository) UpdateLastLogin(id int) error {
 	query := `UPDATE users SET last_login_at = NOW() WHERE id = ?`
@@ -106,6 +139,37 @@ func (r *adminRepository) GetByEmail(email string) (*models.Admin, error) {
 
 	admin := &models.Admin{}
 	err := r.db.QueryRow(query, email).Scan(
+		&admin.ID,
+		&admin.Name,
+		&admin.Mobile,
+		&admin.Email,
+		&admin.Password,
+		&admin.Image,
+		&admin.LastLoginAt,
+		&admin.CreatedAt,
+		&admin.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("admin not found")
+		}
+		return nil, fmt.Errorf("failed to get admin: %w", err)
+	}
+
+	return admin, nil
+}
+
+// GetByID retrieves an admin by ID
+func (r *adminRepository) GetByID(id int) (*models.Admin, error) {
+	query := `
+		SELECT id, name, mobile, email, password, image, last_login_at, created_at, updated_at
+		FROM admins 
+		WHERE id = ?
+	`
+
+	admin := &models.Admin{}
+	err := r.db.QueryRow(query, id).Scan(
 		&admin.ID,
 		&admin.Name,
 		&admin.Mobile,

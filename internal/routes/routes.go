@@ -27,6 +27,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	userRepo := repositories.NewUserRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
 	passwordResetRepo := repositories.NewPasswordResetRepository(db)
+	sessionRepo := repositories.NewSessionRepository(db)
 	notificationRepo := repositories.NewMySQLNotificationRepository(db)
 	gamenetRepo := repositories.NewGamenetRepository(db)
 
@@ -35,7 +36,8 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	smsService := services.NewSMSService(&cfg.Notification.SMS)
 	notificationService := services.NewNotificationService(
 		emailService, smsService, nil, nil, notificationRepo, cfg)
-	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, notificationService, cfg)
+	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, notificationService, cfg)
+	sessionService := services.NewSessionService(sessionRepo, cfg)
 	gamenetService := services.NewGamenetService(gamenetRepo)
 
 	// Initialize file uploader
@@ -44,6 +46,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(cfg)
 	authHandler := handlers.NewAuthHandler(authService)
+	sessionHandler := handlers.NewSessionHandler(sessionService)
 	notificationHandler := handlers.NewNotificationHandler(
 		notificationService, nil, nil, authService.GetJWTManager())
 	gamenetHandler := handlers.NewGamenetHandler(gamenetService, fileUploader)
@@ -74,10 +77,20 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 
 		// Protected routes (authentication required)
 		protected := v1.Group("/")
-		protected.Use(middlewares.AuthMiddleware(authService))
+		protected.Use(middlewares.AuthMiddlewareWithSession(authService, sessionService))
 		{
 			// User profile routes (accessible by both users and admins)
 			protected.GET("/profile", authHandler.GetProfile)
+			protected.POST("/change-password", authHandler.ChangePassword)
+
+			// Session management routes
+			sessions := protected.Group("/sessions")
+			{
+				sessions.GET("/", sessionHandler.GetActiveSessions)
+				sessions.POST("/:session_id/logout", sessionHandler.LogoutSession)
+				sessions.POST("/logout-others", sessionHandler.LogoutAllOtherSessions)
+				sessions.POST("/logout-all", sessionHandler.LogoutAllSessions)
+			}
 
 			// Notification routes
 			notifications := protected.Group("/notifications")

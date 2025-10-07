@@ -18,6 +18,7 @@ type AuthService struct {
 	userRepo            repositories.UserRepository
 	adminRepo           repositories.AdminRepository
 	passwordResetRepo   repositories.PasswordResetRepositoryInterface
+	sessionRepo         repositories.SessionRepositoryInterface
 	notificationService NotificationServiceInterface
 	jwtManager          *utils.JWTManager
 	config              *config.Config
@@ -28,6 +29,7 @@ func NewAuthService(
 	userRepo repositories.UserRepository,
 	adminRepo repositories.AdminRepository,
 	passwordResetRepo repositories.PasswordResetRepositoryInterface,
+	sessionRepo repositories.SessionRepositoryInterface,
 	notificationService NotificationServiceInterface,
 	cfg *config.Config,
 ) *AuthService {
@@ -35,6 +37,7 @@ func NewAuthService(
 		userRepo:            userRepo,
 		adminRepo:           adminRepo,
 		passwordResetRepo:   passwordResetRepo,
+		sessionRepo:         sessionRepo,
 		notificationService: notificationService,
 		jwtManager:          utils.NewJWTManager(cfg),
 		config:              cfg,
@@ -44,6 +47,48 @@ func NewAuthService(
 // ValidateToken validates a JWT token and returns the claims
 func (s *AuthService) ValidateToken(tokenString string) (*utils.JWTClaims, error) {
 	return s.jwtManager.ValidateToken(tokenString)
+}
+
+// LoginWithSession performs login and creates a session
+func (s *AuthService) LoginWithSession(email, password string, rememberMe bool, deviceInfo, ipAddress, userAgent string) (*models.LoginResponse, error) {
+	loginResponse, err := s.Login(email, password, rememberMe)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create session for the login
+	claims, err := s.jwtManager.ValidateToken(loginResponse.Token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate generated token: %w", err)
+	}
+
+	// Create session in database
+	var deviceInfoPtr, ipAddressPtr, userAgentPtr *string
+	if deviceInfo != "" {
+		deviceInfoPtr = &deviceInfo
+	}
+	if ipAddress != "" {
+		ipAddressPtr = &ipAddress
+	}
+	if userAgent != "" {
+		userAgentPtr = &userAgent
+	}
+
+	_, err = s.sessionRepo.CreateSession(
+		claims.UserID,
+		claims.UserType,
+		loginResponse.Token,
+		deviceInfoPtr,
+		ipAddressPtr,
+		userAgentPtr,
+		loginResponse.ExpiresAt,
+	)
+	if err != nil {
+		// Log error but don't fail the login
+		fmt.Printf("Warning: failed to create session for user %d: %v\n", claims.UserID, err)
+	}
+
+	return loginResponse, nil
 }
 
 // RefreshToken generates a new token with extended expiration
@@ -289,6 +334,77 @@ func (s *AuthService) ValidateResetToken(token string) error {
 	return nil
 }
 
+// ChangePassword changes the password for an authenticated user
+func (s *AuthService) ChangePassword(userID int, userType, currentPassword, newPassword, confirmPassword string) error {
+	// Validate passwords match
+	if newPassword != confirmPassword {
+		return fmt.Errorf("رمز عبور جدید و تأیید رمز عبور مطابقت ندارند")
+	}
+
+	// Validate password strength
+	if len(newPassword) < 6 {
+		return fmt.Errorf("رمز عبور باید حداقل 6 کاراکتر باشد")
+	}
+
+	// Validate current password and get user
+	var currentHashedPassword string
+	var email string
+
+	switch userType {
+	case "user":
+		user, err := s.userRepo.GetByID(userID)
+		if err != nil {
+			return fmt.Errorf("کاربر یافت نشد")
+		}
+		currentHashedPassword = user.Password
+		email = user.Email
+
+	case "admin":
+		admin, err := s.adminRepo.GetByID(userID)
+		if err != nil {
+			return fmt.Errorf("مدیر یافت نشد")
+		}
+		currentHashedPassword = admin.Password
+		email = admin.Email
+
+	default:
+		return fmt.Errorf("نوع کاربر نامعتبر است")
+	}
+
+	// Verify current password
+	if !models.CheckPassword(currentPassword, currentHashedPassword) {
+		return fmt.Errorf("رمز عبور فعلی اشتباه است")
+	}
+
+	// Hash the new password
+	hashedPassword, err := models.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("خطا در رمزنگاری رمز عبور: %w", err)
+	}
+
+	// Update password based on user type
+	switch userType {
+	case "user":
+		if err := s.userRepo.UpdatePassword(userID, hashedPassword); err != nil {
+			return fmt.Errorf("خطا در به‌روزرسانی رمز عبور کاربر: %w", err)
+		}
+	case "admin":
+		if err := s.adminRepo.UpdatePassword(userID, hashedPassword); err != nil {
+			return fmt.Errorf("خطا در به‌روزرسانی رمز عبور مدیر: %w", err)
+		}
+	default:
+		return fmt.Errorf("نوع کاربر نامعتبر است")
+	}
+
+	// Send password change notification email
+	if err := s.sendPasswordChangeNotification(email, userType); err != nil {
+		fmt.Printf("Warning: failed to send password change notification: %v\n", err)
+		// Don't return error here, as the password was changed successfully
+	}
+
+	return nil
+}
+
 // sendPasswordResetEmail sends a password reset email using the notification service
 func (s *AuthService) sendPasswordResetEmail(email, name, token string) error {
 	if s.notificationService == nil {
@@ -312,6 +428,47 @@ func (s *AuthService) sendPasswordResetEmail(email, name, token string) error {
 			"user_name":        name,
 			"reset_link":       resetLink,
 			"expiry_hours":     "0.25", // 15 minutes
+			"unsubscribe_link": unsubscribeLink,
+			"support_link":     supportLink,
+		},
+	}
+
+	// Send the notification
+	ctx := context.Background()
+	return s.notificationService.SendNotification(ctx, notification)
+}
+
+// sendPasswordChangeNotification sends a password change notification email
+func (s *AuthService) sendPasswordChangeNotification(email, userType string) error {
+	if s.notificationService == nil {
+		return fmt.Errorf("notification service not available")
+	}
+
+	// Get user name from the email (we could improve this by passing the name)
+	var name string
+	switch userType {
+	case "user":
+		// We could get the name from the user repository, but for now use email
+		name = "کاربر گرامی"
+	case "admin":
+		name = "مدیر گرامی"
+	default:
+		name = "کاربر گرامی"
+	}
+
+	unsubscribeLink := "http://localhost:3000/unsubscribe?email=" + email
+	supportLink := "http://localhost:3000/support"
+
+	// Create notification request
+	notification := &models.CreateNotificationRequest{
+		Type:      models.NotificationTypeEmail,
+		Priority:  models.NotificationPriorityHigh,
+		Recipient: email,
+		Subject:   fmt.Sprintf("تغییر رمز عبور - %s", s.config.App.Name),
+		Content:   fmt.Sprintf("%s،\n\nرمز عبور حساب کاربری شما در %s با موفقیت تغییر یافت.\n\nاگر شما این تغییر را انجام نداده\u200cاید، لطفاً فوراً با تیم پشتیبانی تماس بگیرید.\n\nبا احترام،\nتیم %s", name, s.config.App.Name, s.config.App.Name),
+		TemplateData: map[string]interface{}{
+			"app_name":         s.config.App.Name,
+			"user_name":        name,
 			"unsubscribe_link": unsubscribeLink,
 			"support_link":     supportLink,
 		},

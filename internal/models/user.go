@@ -135,6 +135,13 @@ type ResetPasswordRequest struct {
 	ConfirmPassword string `json:"confirm_password" binding:"required,min=6"`
 }
 
+// ChangePasswordRequest represents a change password request
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=6"`
+	ConfirmPassword string `json:"confirm_password" binding:"required,min=6"`
+}
+
 // IsExpired checks if the token is expired
 func (prt *PasswordResetToken) IsExpired() bool {
 	return time.Now().After(prt.ExpiresAt)

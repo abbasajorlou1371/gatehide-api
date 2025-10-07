@@ -49,6 +49,56 @@ func AuthMiddleware(authService services.AuthServiceInterface) gin.HandlerFunc {
 	}
 }
 
+// AuthMiddlewareWithSession validates JWT tokens and sessions, sets user information in context
+func AuthMiddlewareWithSession(authService services.AuthServiceInterface, sessionService services.SessionServiceInterface) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Authorization header required",
+			})
+			c.Abort()
+			return
+		}
+
+		// Extract token from "Bearer <token>" format
+		tokenString := authHeader
+		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+			tokenString = authHeader[7:]
+		}
+
+		// Validate token and session
+		session, err := sessionService.ValidateAndUpdateSession(tokenString)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Invalid or expired session",
+			})
+			c.Abort()
+			return
+		}
+
+		// Also validate the JWT token to get claims for compatibility
+		claims, err := authService.ValidateToken(tokenString)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Invalid token",
+			})
+			c.Abort()
+			return
+		}
+
+		// Set user information in context
+		c.Set("user_id", session.UserID)
+		c.Set("user_type", session.UserType)
+		c.Set("user_email", claims.Email)
+		c.Set("user_name", claims.Name)
+		c.Set("user", claims)     // Set claims for compatibility with existing code
+		c.Set("session", session) // Set session for session-specific operations
+
+		c.Next()
+	}
+}
+
 // AdminMiddleware ensures the user is an admin
 func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
