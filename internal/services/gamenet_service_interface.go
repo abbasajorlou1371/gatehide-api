@@ -25,4 +25,7 @@ type GamenetServiceInterface interface {
 
 	// Search searches gamenets with pagination
 	Search(ctx context.Context, req *models.GamenetSearchRequest) (*models.GamenetSearchResponse, error)
+
+	// ResendCredentials generates new password and sends credentials via email
+	ResendCredentials(ctx context.Context, id int) error
 }

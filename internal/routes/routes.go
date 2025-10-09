@@ -40,7 +40,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 		emailService, smsService, nil, nil, notificationRepo, cfg)
 	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 	sessionService := services.NewSessionService(sessionRepo, cfg)
-	gamenetService := services.NewGamenetService(gamenetRepo)
+	gamenetService := services.NewGamenetService(gamenetRepo, smsService, emailService)
 	subscriptionPlanService := services.NewSubscriptionPlanService(subscriptionPlanRepo)
 
 	// Initialize file uploader
@@ -115,6 +115,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 				gamenets.GET("/:id", gamenetHandler.GetGamenetByID)
 				gamenets.PUT("/:id", gamenetHandler.UpdateGamenet)
 				gamenets.DELETE("/:id", gamenetHandler.DeleteGamenet)
+				gamenets.POST("/:id/resend-credentials", gamenetHandler.ResendCredentials)
 			}
 
 			// Subscription Plan routes

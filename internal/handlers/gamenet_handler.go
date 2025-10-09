@@ -284,6 +284,30 @@ func (h *GamenetHandler) DeleteGamenet(c *gin.Context) {
 	})
 }
 
+// ResendCredentials handles POST /gamenets/:id/resend-credentials
+func (h *GamenetHandler) ResendCredentials(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid gamenet ID",
+		})
+		return
+	}
+
+	err = h.gamenetService.ResendCredentials(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Credentials sent successfully via SMS",
+	})
+}
+
 // extractFilePathFromURL extracts the file path from a public URL or relative path
 func (h *GamenetHandler) extractFilePathFromURL(publicURL string) string {
 	// Handle both formats:

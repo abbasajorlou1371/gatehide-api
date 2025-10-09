@@ -288,6 +288,97 @@ func (s *SMSService) normalizePhoneNumber(phone string) string {
 	return cleaned
 }
 
+// SendGamenetCredentials sends gamenet credentials using Kavenegar Verify Lookup or regular SMS as fallback
+func (s *SMSService) SendGamenetCredentials(ctx context.Context, mobile, email, password string) error {
+	if !s.config.Enabled {
+		return fmt.Errorf("SMS service is disabled")
+	}
+
+	if s.client == nil {
+		return fmt.Errorf("SMS service not properly configured")
+	}
+
+	// Validate phone number
+	if !s.ValidatePhoneNumber(mobile) {
+		return fmt.Errorf("invalid phone number: %s", mobile)
+	}
+
+	// Normalize phone number
+	phoneNumber := s.normalizePhoneNumber(mobile)
+
+	// Set timeout for the request
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// Template name from Kavenegar panel
+	template := "gamenet-credentials"
+
+	// Try Verify Lookup first (preferred method with template)
+	params := &kavenegar.VerifyLookupParam{
+		Token2: email,
+		Token3: password,
+	}
+
+	res, err := s.client.Verify.Lookup(phoneNumber, template, email, params)
+	if err != nil {
+		// Check if it's a template not found error (424)
+		if apiErr, ok := err.(*kavenegar.APIError); ok && apiErr.Status == 424 {
+			// Template doesn't exist, use fallback to regular SMS
+			fmt.Printf("Template not found, using regular SMS fallback\n")
+			return s.sendCredentialsViaSMS(ctx, phoneNumber, email, password)
+		}
+		return s.handleKavenegarError(err)
+	}
+
+	// Check if the response indicates success
+	if res.Status == 200 {
+		fmt.Printf("Successfully sent credentials SMS via Verify Lookup to %s\n", mobile)
+		return nil
+	}
+
+	// If Verify Lookup failed, try regular SMS as fallback
+	fmt.Printf("Verify Lookup returned status %d, using regular SMS fallback\n", res.Status)
+	return s.sendCredentialsViaSMS(ctx, phoneNumber, email, password)
+}
+
+// sendCredentialsViaSMS sends credentials using regular SMS (fallback method)
+func (s *SMSService) sendCredentialsViaSMS(ctx context.Context, phoneNumber, email, password string) error {
+	// Construct message
+	message := fmt.Sprintf("اطلاعات ورود به سیستم گیت نت:\nایمیل: %s\nرمز عبور: %s", email, password)
+
+	// Send the SMS (NO RETRIES to avoid duplicate credentials)
+	receptor := []string{phoneNumber}
+
+	// Use empty sender to use account's default sender line (as per Kavenegar SDK docs)
+	// Reference: https://github.com/kavenegar/kavenegar-go
+	sender := ""
+
+	fmt.Printf("📤 Sending credentials SMS to %s...\n", phoneNumber)
+	res, err := s.client.Message.Send(sender, receptor, message, nil)
+	if err != nil {
+		fmt.Printf("❌ SMS Error: %v\n", err)
+		return s.handleKavenegarError(err)
+	}
+
+	// Check if the response indicates message was accepted
+	if len(res) > 0 {
+		fmt.Printf("📱 SMS Response: Status = %d, MessageID = %d\n", res[0].Status, res[0].MessageID)
+
+		// Kavenegar Status Codes:
+		// 1 = Queued (normal success)
+		// 5 = Sent with sender warning (still delivered)
+		// Accept both status 1 and 5 as success since message is delivered
+		if res[0].Status == 1 || res[0].Status == 5 {
+			fmt.Printf("✅ Credentials SMS sent successfully to %s (MessageID: %d)\n", phoneNumber, res[0].MessageID)
+			return nil
+		}
+
+		return fmt.Errorf("SMS sending failed with status: %d", res[0].Status)
+	}
+
+	return fmt.Errorf("SMS sending failed: no response from Kavenegar")
+}
+
 // handleKavenegarError handles Kavenegar-specific errors
 func (s *SMSService) handleKavenegarError(err error) error {
 	switch e := err.(type) {

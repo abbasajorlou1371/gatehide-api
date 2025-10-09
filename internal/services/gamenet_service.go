@@ -11,13 +11,17 @@ import (
 
 // gamenetService implements GamenetServiceInterface
 type gamenetService struct {
-	gamenetRepo repositories.GamenetRepository
+	gamenetRepo  repositories.GamenetRepository
+	smsService   *SMSService
+	emailService *EmailService
 }
 
 // NewGamenetService creates a new gamenet service
-func NewGamenetService(gamenetRepo repositories.GamenetRepository) GamenetServiceInterface {
+func NewGamenetService(gamenetRepo repositories.GamenetRepository, smsService *SMSService, emailService *EmailService) GamenetServiceInterface {
 	return &gamenetService{
-		gamenetRepo: gamenetRepo,
+		gamenetRepo:  gamenetRepo,
+		smsService:   smsService,
+		emailService: emailService,
 	}
 }
 
@@ -76,6 +80,17 @@ func (s *gamenetService) Create(ctx context.Context, req *models.GamenetCreateRe
 		return nil, fmt.Errorf("failed to create gamenet: %w", err)
 	}
 
+	// Send credentials via SMS using Kavenegar Verify Lookup
+	if s.smsService != nil {
+		err = s.smsService.SendGamenetCredentials(ctx, req.OwnerMobile, req.Email, randomPassword)
+		if err != nil {
+			// Log the error but don't fail the creation
+			fmt.Printf("Warning: Failed to send credentials SMS to %s: %v\n", req.OwnerMobile, err)
+		} else {
+			fmt.Printf("Successfully sent credentials SMS to %s\n", req.OwnerMobile)
+		}
+	}
+
 	response := gamenet.ToResponse()
 	return &response, nil
 }
@@ -127,4 +142,50 @@ func (s *gamenetService) Search(ctx context.Context, req *models.GamenetSearchRe
 	}
 
 	return result, nil
+}
+
+// ResendCredentials generates new password and sends credentials via email
+func (s *gamenetService) ResendCredentials(ctx context.Context, id int) error {
+	// Get gamenet details
+	gamenet, err := s.gamenetRepo.GetByID(id)
+	if err != nil {
+		return fmt.Errorf("gamenet not found: %w", err)
+	}
+
+	// Generate new random 8-digit password
+	newPassword, err := utils.GenerateRandomPassword()
+	if err != nil {
+		return fmt.Errorf("failed to generate password: %w", err)
+	}
+
+	// Hash the new password
+	hashedPassword, err := models.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// Update password in database
+	updateReq := &models.GamenetUpdateRequest{
+		Password: &hashedPassword,
+	}
+	err = s.gamenetRepo.Update(id, updateReq)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	// Send credentials via SMS
+	if s.smsService != nil {
+		err = s.smsService.SendGamenetCredentials(ctx, gamenet.OwnerMobile, gamenet.Email, newPassword)
+		if err != nil {
+			// Log error but don't fail the operation
+			fmt.Printf("Warning: Failed to send credentials SMS to %s: %v\n", gamenet.OwnerMobile, err)
+			return fmt.Errorf("password updated but failed to send SMS: %w", err)
+		}
+
+		fmt.Printf("Successfully sent credentials SMS to %s\n", gamenet.OwnerMobile)
+	} else {
+		return fmt.Errorf("SMS service not configured")
+	}
+
+	return nil
 }
