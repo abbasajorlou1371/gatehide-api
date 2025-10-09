@@ -18,6 +18,7 @@ import (
 type AuthService struct {
 	userRepo              repositories.UserRepository
 	adminRepo             repositories.AdminRepository
+	gamenetRepo           repositories.GamenetRepository
 	passwordResetRepo     repositories.PasswordResetRepositoryInterface
 	sessionRepo           repositories.SessionRepositoryInterface
 	emailVerificationRepo *repositories.EmailVerificationRepository
@@ -30,6 +31,7 @@ type AuthService struct {
 func NewAuthService(
 	userRepo repositories.UserRepository,
 	adminRepo repositories.AdminRepository,
+	gamenetRepo repositories.GamenetRepository,
 	passwordResetRepo repositories.PasswordResetRepositoryInterface,
 	sessionRepo repositories.SessionRepositoryInterface,
 	emailVerificationRepo *repositories.EmailVerificationRepository,
@@ -39,6 +41,7 @@ func NewAuthService(
 	return &AuthService{
 		userRepo:              userRepo,
 		adminRepo:             adminRepo,
+		gamenetRepo:           gamenetRepo,
 		passwordResetRepo:     passwordResetRepo,
 		sessionRepo:           sessionRepo,
 		emailVerificationRepo: emailVerificationRepo,
@@ -158,7 +161,35 @@ func (s *AuthService) Login(email, password string, rememberMe bool) (*models.Lo
 		}
 	}
 
-	// If both failed, return invalid credentials error
+	// If both failed, try gamenet login
+	gamenet, gamenetErr := s.gamenetRepo.GetByEmail(email)
+	if gamenetErr == nil {
+		// Verify password for gamenet
+		if models.CheckPassword(password, gamenet.Password) {
+			// Generate JWT token for gamenet
+			token, err := s.jwtManager.GenerateToken(gamenet.ID, "gamenet", gamenet.Email, gamenet.Name, rememberMe)
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate token: %w", err)
+			}
+
+			// Update last login
+			if err := s.gamenetRepo.UpdateLastLogin(gamenet.ID); err != nil {
+				fmt.Printf("Warning: failed to update last login for gamenet %d: %v\n", gamenet.ID, err)
+			}
+
+			// Calculate token expiration
+			expiresAt := time.Now().Add(time.Duration(s.config.Security.JWTExpiration) * time.Hour)
+
+			return &models.LoginResponse{
+				Token:     token,
+				UserType:  "gamenet",
+				User:      gamenet.ToResponse(),
+				ExpiresAt: expiresAt,
+			}, nil
+		}
+	}
+
+	// If all three failed, return invalid credentials error
 	return nil, fmt.Errorf("invalid credentials")
 }
 
@@ -180,6 +211,11 @@ func (s *AuthService) GetUserByID(userID int) (*models.User, error) {
 // GetAdminByID retrieves an admin by ID
 func (s *AuthService) GetAdminByID(adminID int) (*models.Admin, error) {
 	return s.adminRepo.GetByID(adminID)
+}
+
+// GetGamenetByID retrieves a gamenet by ID
+func (s *AuthService) GetGamenetByID(gamenetID int) (*models.Gamenet, error) {
+	return s.gamenetRepo.GetByID(gamenetID)
 }
 
 // UpdateUserProfile updates a user's profile
@@ -230,6 +266,43 @@ func (s *AuthService) UpdateAdminProfile(adminID int, name, mobile, image string
 	return &response, nil
 }
 
+// UpdateGamenetProfile updates a gamenet's profile
+func (s *AuthService) UpdateGamenetProfile(gamenetID int, name, mobile, image string) (*models.GamenetResponse, error) {
+	// Check if gamenet exists
+	_, err := s.gamenetRepo.GetByID(gamenetID)
+	if err != nil {
+		return nil, fmt.Errorf("gamenet not found: %w", err)
+	}
+
+	// Build update request
+	updateReq := &models.GamenetUpdateRequest{}
+
+	if name != "" {
+		updateReq.Name = &name
+	}
+	if mobile != "" {
+		updateReq.OwnerMobile = &mobile
+	}
+	if image != "" {
+		updateReq.LicenseAttachment = &image
+	}
+
+	// Save to database
+	err = s.gamenetRepo.Update(gamenetID, updateReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update gamenet profile: %w", err)
+	}
+
+	// Get updated gamenet
+	updatedGamenet, err := s.gamenetRepo.GetByID(gamenetID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get updated gamenet: %w", err)
+	}
+
+	response := updatedGamenet.ToResponse()
+	return &response, nil
+}
+
 // UpdateUserEmail updates a user's email
 func (s *AuthService) UpdateUserEmail(userID int, newEmail string) (*models.UserResponse, error) {
 	user, err := s.userRepo.GetByID(userID)
@@ -267,6 +340,35 @@ func (s *AuthService) UpdateAdminEmail(adminID int, newEmail string) (*models.Ad
 	}
 
 	response := admin.ToResponse()
+	return &response, nil
+}
+
+// UpdateGamenetEmail updates a gamenet's email
+func (s *AuthService) UpdateGamenetEmail(gamenetID int, newEmail string) (*models.GamenetResponse, error) {
+	// Check if gamenet exists
+	_, err := s.gamenetRepo.GetByID(gamenetID)
+	if err != nil {
+		return nil, fmt.Errorf("gamenet not found: %w", err)
+	}
+
+	// Update email
+	updateReq := &models.GamenetUpdateRequest{
+		Email: &newEmail,
+	}
+
+	// Save to database
+	err = s.gamenetRepo.Update(gamenetID, updateReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update gamenet email: %w", err)
+	}
+
+	// Get updated gamenet
+	updatedGamenet, err := s.gamenetRepo.GetByID(gamenetID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get updated gamenet: %w", err)
+	}
+
+	response := updatedGamenet.ToResponse()
 	return &response, nil
 }
 
@@ -348,7 +450,38 @@ func (s *AuthService) ForgotPassword(email string) error {
 		return nil
 	}
 
-	// If neither user nor admin found, return error
+	// If both not found, try gamenet
+	gamenet, gamenetErr := s.gamenetRepo.GetByEmail(email)
+	if gamenetErr == nil {
+		// Invalidate any existing tokens for this gamenet
+		if err := s.passwordResetRepo.InvalidateUserTokens(gamenet.ID, "gamenet"); err != nil {
+			fmt.Printf("Warning: failed to invalidate existing tokens for gamenet %d: %v\n", gamenet.ID, err)
+		}
+
+		// Generate new reset token
+		token, err := s.generateResetToken()
+		if err != nil {
+			return fmt.Errorf("failed to generate reset token: %w", err)
+		}
+
+		// Set token expiration (15 minutes from now)
+		expiresAt := time.Now().Add(15 * time.Minute)
+
+		// Create the token in database
+		if err := s.passwordResetRepo.CreateToken(gamenet.ID, "gamenet", token, expiresAt); err != nil {
+			return fmt.Errorf("failed to create reset token: %w", err)
+		}
+
+		// Send password reset email
+		if err := s.sendPasswordResetEmail(gamenet.Email, gamenet.Name, token); err != nil {
+			fmt.Printf("Warning: failed to send password reset email to %s: %v\n", email, err)
+			// Don't return error here, as the token was created successfully
+		}
+
+		return nil
+	}
+
+	// If none found, return error
 	return fmt.Errorf("email not found")
 }
 
@@ -387,6 +520,11 @@ func (s *AuthService) ResetPassword(token, email, newPassword, confirmPassword s
 		if err != nil || admin.ID != resetToken.UserID {
 			return fmt.Errorf("invalid email for this token")
 		}
+	case "gamenet":
+		gamenet, err := s.gamenetRepo.GetByEmail(email)
+		if err != nil || gamenet.ID != resetToken.UserID {
+			return fmt.Errorf("invalid email for this token")
+		}
 	}
 
 	// Hash the new password
@@ -404,6 +542,13 @@ func (s *AuthService) ResetPassword(token, email, newPassword, confirmPassword s
 	case "admin":
 		if err := s.adminRepo.UpdatePassword(resetToken.UserID, hashedPassword); err != nil {
 			return fmt.Errorf("failed to update admin password: %w", err)
+		}
+	case "gamenet":
+		updateReq := &models.GamenetUpdateRequest{
+			Password: &hashedPassword,
+		}
+		if err := s.gamenetRepo.Update(resetToken.UserID, updateReq); err != nil {
+			return fmt.Errorf("failed to update gamenet password: %w", err)
 		}
 	default:
 		return fmt.Errorf("invalid user type")
@@ -469,6 +614,14 @@ func (s *AuthService) ChangePassword(userID int, userType, currentPassword, newP
 		currentHashedPassword = admin.Password
 		email = admin.Email
 
+	case "gamenet":
+		gamenet, err := s.gamenetRepo.GetByID(userID)
+		if err != nil {
+			return fmt.Errorf("گیم‌نت یافت نشد")
+		}
+		currentHashedPassword = gamenet.Password
+		email = gamenet.Email
+
 	default:
 		return fmt.Errorf("نوع کاربر نامعتبر است")
 	}
@@ -493,6 +646,13 @@ func (s *AuthService) ChangePassword(userID int, userType, currentPassword, newP
 	case "admin":
 		if err := s.adminRepo.UpdatePassword(userID, hashedPassword); err != nil {
 			return fmt.Errorf("خطا در به‌روزرسانی رمز عبور مدیر: %w", err)
+		}
+	case "gamenet":
+		updateReq := &models.GamenetUpdateRequest{
+			Password: &hashedPassword,
+		}
+		if err := s.gamenetRepo.Update(userID, updateReq); err != nil {
+			return fmt.Errorf("خطا در به‌روزرسانی رمز عبور گیم‌نت: %w", err)
 		}
 	default:
 		return fmt.Errorf("نوع کاربر نامعتبر است")
@@ -526,14 +686,22 @@ func (s *AuthService) SendEmailVerification(userID int, userType, newEmail strin
 	var userName string
 	var currentEmail string
 
-	if userType == "admin" {
+	switch userType {
+	case "admin":
 		admin, err := s.adminRepo.GetByID(userID)
 		if err != nil {
 			return "", fmt.Errorf("failed to get admin information: %w", err)
 		}
 		userName = admin.Name
 		currentEmail = admin.Email
-	} else {
+	case "gamenet":
+		gamenet, err := s.gamenetRepo.GetByID(userID)
+		if err != nil {
+			return "", fmt.Errorf("failed to get gamenet information: %w", err)
+		}
+		userName = gamenet.Name
+		currentEmail = gamenet.Email
+	default: // "user"
 		user, err := s.userRepo.GetByID(userID)
 		if err != nil {
 			return "", fmt.Errorf("failed to get user information: %w", err)
@@ -642,6 +810,8 @@ func (s *AuthService) sendPasswordChangeNotification(email, userType string) err
 		name = "کاربر گرامی"
 	case "admin":
 		name = "مدیر گرامی"
+	case "gamenet":
+		name = "گیم‌نت گرامی"
 	default:
 		name = "کاربر گرامی"
 	}
@@ -669,7 +839,7 @@ func (s *AuthService) sendPasswordChangeNotification(email, userType string) err
 	return s.notificationService.SendNotification(ctx, notification)
 }
 
-// CheckEmailExists checks if an email already exists in the system (users or admins)
+// CheckEmailExists checks if an email already exists in the system (users, admins, or gamenets)
 func (s *AuthService) CheckEmailExists(email string) (bool, error) {
 	// Check if email exists in users table
 	_, err := s.userRepo.GetByEmail(email)
@@ -689,6 +859,15 @@ func (s *AuthService) CheckEmailExists(email string) (bool, error) {
 		return false, fmt.Errorf("failed to check admin email: %w", err)
 	}
 
-	// Email doesn't exist in either table
+	// Check if email exists in gamenets table
+	_, err = s.gamenetRepo.GetByEmail(email)
+	if err == nil {
+		return true, nil // Email exists in gamenets table
+	}
+	if err != sql.ErrNoRows {
+		return false, fmt.Errorf("failed to check gamenet email: %w", err)
+	}
+
+	// Email doesn't exist in any table
 	return false, nil
 }

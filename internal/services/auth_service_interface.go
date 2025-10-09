@@ -14,10 +14,13 @@ type AuthServiceInterface interface {
 	GetUserFromToken(tokenString string) (*utils.JWTClaims, error)
 	GetUserByID(userID int) (*models.User, error)
 	GetAdminByID(adminID int) (*models.Admin, error)
+	GetGamenetByID(gamenetID int) (*models.Gamenet, error)
 	UpdateUserProfile(userID int, name, mobile, image string) (*models.UserResponse, error)
 	UpdateAdminProfile(adminID int, name, mobile, image string) (*models.AdminResponse, error)
+	UpdateGamenetProfile(gamenetID int, name, mobile, image string) (*models.GamenetResponse, error)
 	UpdateUserEmail(userID int, newEmail string) (*models.UserResponse, error)
 	UpdateAdminEmail(adminID int, newEmail string) (*models.AdminResponse, error)
+	UpdateGamenetEmail(gamenetID int, newEmail string) (*models.GamenetResponse, error)
 	ForgotPassword(email string) error
 	ResetPassword(token, email, newPassword, confirmPassword string) error
 	ValidateResetToken(token string) error

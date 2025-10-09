@@ -38,7 +38,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	smsService := services.NewSMSService(&cfg.Notification.SMS)
 	notificationService := services.NewNotificationService(
 		emailService, smsService, nil, nil, notificationRepo, cfg)
-	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
+	authService := services.NewAuthService(userRepo, adminRepo, gamenetRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 	sessionService := services.NewSessionService(sessionRepo, cfg)
 	gamenetService := services.NewGamenetService(gamenetRepo, smsService, emailService)
 	subscriptionPlanService := services.NewSubscriptionPlanService(subscriptionPlanRepo)
@@ -145,6 +145,16 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 				// Add user-specific routes here
 				user.GET("/dashboard", func(c *gin.Context) {
 					c.JSON(200, gin.H{"message": "User dashboard", "user": c.GetString("user_name")})
+				})
+			}
+
+			// Gamenet-only routes
+			gamenet := protected.Group("/gamenet")
+			gamenet.Use(middlewares.GamenetMiddleware())
+			{
+				// Add gamenet-specific routes here
+				gamenet.GET("/dashboard", func(c *gin.Context) {
+					c.JSON(200, gin.H{"message": "Gamenet dashboard", "gamenet": c.GetString("user_name")})
 				})
 			}
 		}

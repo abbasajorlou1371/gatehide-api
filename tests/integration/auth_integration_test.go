@@ -427,6 +427,7 @@ func setupTestRouter(cfg *config.Config, db *sql.DB) *gin.Engine {
 	userRepo := repositories.NewUserRepository(db)
 	adminRepo := repositories.NewAdminRepository(db)
 	passwordResetRepo := repositories.NewPasswordResetRepository(db)
+	gamenetRepo := repositories.NewGamenetRepository(db)
 	sessionRepo := repositories.NewSessionRepository(db)
 	emailVerificationRepo := repositories.NewEmailVerificationRepository(db)
 	notificationService := &testutils.MockNotificationService{}
@@ -435,7 +436,7 @@ func setupTestRouter(cfg *config.Config, db *sql.DB) *gin.Engine {
 	fileUploader := utils.NewFileUploader(&cfg.FileStorage)
 
 	// Initialize services
-	authService := services.NewAuthService(userRepo, adminRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
+	authService := services.NewAuthService(userRepo, adminRepo, gamenetRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(cfg)

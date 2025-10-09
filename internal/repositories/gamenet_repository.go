@@ -11,8 +11,10 @@ import (
 type GamenetRepository interface {
 	GetAll() ([]models.Gamenet, error)
 	GetByID(id int) (*models.Gamenet, error)
+	GetByEmail(email string) (*models.Gamenet, error)
 	Create(gamenet *models.Gamenet) error
 	Update(id int, gamenet *models.GamenetUpdateRequest) error
+	UpdateLastLogin(id int) error
 	Delete(id int) error
 	Search(req *models.GamenetSearchRequest) (*models.GamenetSearchResponse, error)
 }
@@ -81,6 +83,39 @@ func (r *gamenetRepository) GetByID(id int) (*models.Gamenet, error) {
 
 	var gamenet models.Gamenet
 	err := r.db.QueryRow(query, id).Scan(
+		&gamenet.ID,
+		&gamenet.Name,
+		&gamenet.OwnerName,
+		&gamenet.OwnerMobile,
+		&gamenet.Address,
+		&gamenet.Email,
+		&gamenet.Password,
+		&gamenet.LicenseAttachment,
+		&gamenet.CreatedAt,
+		&gamenet.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("gamenet not found")
+		}
+		return nil, fmt.Errorf("failed to get gamenet: %w", err)
+	}
+
+	return &gamenet, nil
+}
+
+// GetByEmail retrieves a gamenet by email
+func (r *gamenetRepository) GetByEmail(email string) (*models.Gamenet, error) {
+	query := `
+		SELECT id, name, owner_name, owner_mobile, address, email, password, license_attachment, 
+		       created_at, updated_at
+		FROM gamenets 
+		WHERE email = ?
+	`
+
+	var gamenet models.Gamenet
+	err := r.db.QueryRow(query, email).Scan(
 		&gamenet.ID,
 		&gamenet.Name,
 		&gamenet.OwnerName,
@@ -183,6 +218,18 @@ func (r *gamenetRepository) Update(id int, updateData *models.GamenetUpdateReque
 	_, err := r.db.Exec(query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update gamenet: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateLastLogin updates the last login timestamp for a gamenet
+func (r *gamenetRepository) UpdateLastLogin(id int) error {
+	query := "UPDATE gamenets SET updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+
+	_, err := r.db.Exec(query, id)
+	if err != nil {
+		return fmt.Errorf("failed to update last login: %w", err)
 	}
 
 	return nil

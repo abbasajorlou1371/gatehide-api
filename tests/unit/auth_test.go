@@ -415,6 +415,15 @@ func TestRequireAuthMiddleware(t *testing.T) {
 			expectedError:  false,
 		},
 		{
+			name:     "valid gamenet",
+			userType: "gamenet",
+			setupUser: func(c *gin.Context) {
+				c.Set("user_type", "gamenet")
+			},
+			expectedStatus: http.StatusOK,
+			expectedError:  false,
+		},
+		{
 			name:     "invalid user type",
 			userType: "guest",
 			setupUser: func(c *gin.Context) {
@@ -568,6 +577,87 @@ func TestGetCurrentUser(t *testing.T) {
 			} else {
 				assert.False(t, exists)
 				assert.Nil(t, user)
+			}
+		})
+	}
+}
+
+func TestGamenetMiddleware(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name           string
+		userType       string
+		setupUser      func(*gin.Context)
+		expectedStatus int
+		expectedError  bool
+	}{
+		{
+			name:     "valid gamenet",
+			userType: "gamenet",
+			setupUser: func(c *gin.Context) {
+				c.Set("user_type", "gamenet")
+			},
+			expectedStatus: http.StatusOK,
+			expectedError:  false,
+		},
+		{
+			name:     "invalid user type (user)",
+			userType: "user",
+			setupUser: func(c *gin.Context) {
+				c.Set("user_type", "user")
+			},
+			expectedStatus: http.StatusForbidden,
+			expectedError:  true,
+		},
+		{
+			name:     "invalid user type (admin)",
+			userType: "admin",
+			setupUser: func(c *gin.Context) {
+				c.Set("user_type", "admin")
+			},
+			expectedStatus: http.StatusForbidden,
+			expectedError:  true,
+		},
+		{
+			name:     "no user type set",
+			userType: "",
+			setupUser: func(c *gin.Context) {
+				// Don't set user_type
+			},
+			expectedStatus: http.StatusUnauthorized,
+			expectedError:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup router with middleware
+			router := gin.New()
+			router.Use(func(c *gin.Context) {
+				tt.setupUser(c)
+				c.Next()
+			})
+			router.Use(middlewares.GamenetMiddleware())
+			router.GET("/test", func(c *gin.Context) {
+				c.JSON(http.StatusOK, gin.H{"message": "gamenet access granted"})
+			})
+
+			// Setup request
+			req := httptest.NewRequest("GET", "/test", nil)
+
+			// Setup response recorder
+			w := httptest.NewRecorder()
+
+			// Execute
+			router.ServeHTTP(w, req)
+
+			// Assert
+			assert.Equal(t, tt.expectedStatus, w.Code)
+			if tt.expectedError {
+				assert.Contains(t, w.Body.String(), "error")
+			} else {
+				assert.Contains(t, w.Body.String(), "gamenet access granted")
 			}
 		})
 	}

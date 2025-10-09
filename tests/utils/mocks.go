@@ -209,6 +209,14 @@ func (m *MockAuthService) GetAdminByID(adminID int) (*models.Admin, error) {
 	return args.Get(0).(*models.Admin), args.Error(1)
 }
 
+func (m *MockAuthService) GetGamenetByID(gamenetID int) (*models.Gamenet, error) {
+	args := m.Called(gamenetID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Gamenet), args.Error(1)
+}
+
 func (m *MockAuthService) UpdateUserProfile(userID int, name, mobile, image string) (*models.UserResponse, error) {
 	args := m.Called(userID, name, mobile, image)
 	if args.Get(0) == nil {
@@ -225,6 +233,14 @@ func (m *MockAuthService) UpdateAdminProfile(adminID int, name, mobile, image st
 	return args.Get(0).(*models.AdminResponse), args.Error(1)
 }
 
+func (m *MockAuthService) UpdateGamenetProfile(gamenetID int, name, mobile, image string) (*models.GamenetResponse, error) {
+	args := m.Called(gamenetID, name, mobile, image)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.GamenetResponse), args.Error(1)
+}
+
 func (m *MockAuthService) UpdateUserEmail(userID int, newEmail string) (*models.UserResponse, error) {
 	args := m.Called(userID, newEmail)
 	if args.Get(0) == nil {
@@ -239,6 +255,14 @@ func (m *MockAuthService) UpdateAdminEmail(adminID int, newEmail string) (*model
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*models.AdminResponse), args.Error(1)
+}
+
+func (m *MockAuthService) UpdateGamenetEmail(gamenetID int, newEmail string) (*models.GamenetResponse, error) {
+	args := m.Called(gamenetID, newEmail)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.GamenetResponse), args.Error(1)
 }
 
 func (m *MockAuthService) SendEmailVerification(userID int, userType, newEmail string) (string, error) {

@@ -161,7 +161,8 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 	// Fetch complete user data from database
 	var user interface{}
 
-	if claims.UserType == "admin" {
+	switch claims.UserType {
+	case "admin":
 		admin, err := h.authService.GetAdminByID(claims.UserID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -170,7 +171,16 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 			return
 		}
 		user = admin.ToResponse()
-	} else {
+	case "gamenet":
+		gamenet, err := h.authService.GetGamenetByID(claims.UserID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to retrieve gamenet profile",
+			})
+			return
+		}
+		user = gamenet.ToResponse()
+	default: // "user"
 		userModel, err := h.authService.GetUserByID(claims.UserID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -225,9 +235,12 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	var user interface{}
 	var err error
 
-	if claims.UserType == "admin" {
+	switch claims.UserType {
+	case "admin":
 		user, err = h.authService.UpdateAdminProfile(claims.UserID, req.Name, req.Mobile, req.Image)
-	} else {
+	case "gamenet":
+		user, err = h.authService.UpdateGamenetProfile(claims.UserID, req.Name, req.Mobile, req.Image)
+	default: // "user"
 		user, err = h.authService.UpdateUserProfile(claims.UserID, req.Name, req.Mobile, req.Image)
 	}
 
@@ -524,9 +537,12 @@ func (h *AuthHandler) VerifyEmailCode(c *gin.Context) {
 	// Update email in database
 	var user interface{}
 
-	if claims.UserType == "admin" {
+	switch claims.UserType {
+	case "admin":
 		user, err = h.authService.UpdateAdminEmail(claims.UserID, req.NewEmail)
-	} else {
+	case "gamenet":
+		user, err = h.authService.UpdateGamenetEmail(claims.UserID, req.NewEmail)
+	default: // "user"
 		user, err = h.authService.UpdateUserEmail(claims.UserID, req.NewEmail)
 	}
 
@@ -566,9 +582,12 @@ func (h *AuthHandler) UploadProfileImage(c *gin.Context) {
 
 	// Update user profile with new image URL
 	var user interface{}
-	if claims.UserType == "admin" {
+	switch claims.UserType {
+	case "admin":
 		user, err = h.authService.UpdateAdminProfile(claims.UserID, "", "", uploadResult.PublicURL)
-	} else {
+	case "gamenet":
+		user, err = h.authService.UpdateGamenetProfile(claims.UserID, "", "", uploadResult.PublicURL)
+	default: // "user"
 		user, err = h.authService.UpdateUserProfile(claims.UserID, "", "", uploadResult.PublicURL)
 	}
 	if err != nil {

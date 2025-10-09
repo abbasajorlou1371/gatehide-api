@@ -147,6 +147,30 @@ func UserMiddleware() gin.HandlerFunc {
 	}
 }
 
+// GamenetMiddleware ensures the user is a gamenet
+func GamenetMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userType, exists := c.Get("user_type")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "User type not found in context",
+			})
+			c.Abort()
+			return
+		}
+
+		if userType != "gamenet" {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "Gamenet access required",
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
 // OptionalAuthMiddleware validates JWT tokens if present but doesn't require them
 func OptionalAuthMiddleware(authService services.AuthServiceInterface) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -177,7 +201,7 @@ func OptionalAuthMiddleware(authService services.AuthServiceInterface) gin.Handl
 	}
 }
 
-// RequireAuthMiddleware ensures user is authenticated (either admin or user)
+// RequireAuthMiddleware ensures user is authenticated (admin, user, or gamenet)
 func RequireAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userType, exists := c.Get("user_type")
@@ -189,7 +213,7 @@ func RequireAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		if userType != "admin" && userType != "user" {
+		if userType != "admin" && userType != "user" && userType != "gamenet" {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Invalid user type",
 			})

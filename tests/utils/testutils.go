@@ -82,6 +82,7 @@ func CleanupTestDB(t *testing.T, db *sql.DB) {
 		"DELETE FROM user_sessions",
 		"DELETE FROM users",
 		"DELETE FROM admins",
+		"DELETE FROM gamenets",
 		"DELETE FROM migrations",
 	}
 
@@ -105,10 +106,12 @@ func CleanupTestDBForce(t *testing.T, db *sql.DB) {
 		"DELETE FROM user_sessions",
 		"DELETE FROM users",
 		"DELETE FROM admins",
+		"DELETE FROM gamenets",
 		"DELETE FROM migrations",
 		"ALTER TABLE user_sessions AUTO_INCREMENT = 1",
 		"ALTER TABLE users AUTO_INCREMENT = 1",
 		"ALTER TABLE admins AUTO_INCREMENT = 1",
+		"ALTER TABLE gamenets AUTO_INCREMENT = 1",
 		"ALTER TABLE migrations AUTO_INCREMENT = 1",
 	}
 
@@ -249,12 +252,36 @@ func runTestMigrations(db *sql.DB) error {
 		return fmt.Errorf("failed to create admins table: %w", err)
 	}
 
+	// Create gamenets table
+	gamenetsTable := `
+		CREATE TABLE IF NOT EXISTS gamenets (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			name VARCHAR(255) NOT NULL,
+			owner_name VARCHAR(255) NOT NULL,
+			owner_mobile VARCHAR(20) NOT NULL,
+			address TEXT NOT NULL,
+			email VARCHAR(255) NOT NULL UNIQUE,
+			password VARCHAR(255) NOT NULL,
+			license_attachment VARCHAR(500) NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			
+			INDEX idx_email (email),
+			INDEX idx_owner_mobile (owner_mobile),
+			INDEX idx_created_at (created_at)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+	`
+
+	if _, err := db.Exec(gamenetsTable); err != nil {
+		return fmt.Errorf("failed to create gamenets table: %w", err)
+	}
+
 	// Create user_sessions table
 	userSessionsTable := `
 		CREATE TABLE IF NOT EXISTS user_sessions (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			user_id INT NOT NULL,
-			user_type ENUM('user', 'admin') NOT NULL,
+			user_type ENUM('user', 'admin', 'gamenet') NOT NULL,
 			session_token VARCHAR(500) NOT NULL UNIQUE,
 			device_info TEXT NULL,
 			ip_address VARCHAR(45) NULL,
