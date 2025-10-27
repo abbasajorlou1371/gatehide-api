@@ -14,6 +14,8 @@ type User struct {
 	Email       string     `json:"email" db:"email"`
 	Password    string     `json:"-" db:"password"` // Hidden from JSON
 	Image       *string    `json:"image" db:"image"`
+	Balance     float64    `json:"balance" db:"balance"`
+	Debt        float64    `json:"debt" db:"debt"`
 	LastLoginAt *time.Time `json:"last_login_at" db:"last_login_at"`
 	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
@@ -54,6 +56,8 @@ type UserResponse struct {
 	Mobile      string     `json:"mobile"`
 	Email       string     `json:"email"`
 	Image       *string    `json:"image"`
+	Balance     float64    `json:"balance"`
+	Debt        float64    `json:"debt"`
 	LastLoginAt *time.Time `json:"last_login_at"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
@@ -79,6 +83,8 @@ func (u *User) ToResponse() UserResponse {
 		Mobile:      u.Mobile,
 		Email:       u.Email,
 		Image:       u.Image,
+		Balance:     u.Balance,
+		Debt:        u.Debt,
 		LastLoginAt: u.LastLoginAt,
 		CreatedAt:   u.CreatedAt,
 		UpdatedAt:   u.UpdatedAt,
@@ -155,4 +161,32 @@ func (prt *PasswordResetToken) IsUsed() bool {
 // IsValid checks if the token is valid (not expired and not used)
 func (prt *PasswordResetToken) IsValid() bool {
 	return !prt.IsExpired() && !prt.IsUsed()
+}
+
+// UserCreateRequest represents a request to create a new user
+type UserCreateRequest struct {
+	Name   string `json:"name" binding:"required,min=2"`
+	Email  string `json:"email" binding:"required,email"`
+	Mobile string `json:"mobile" binding:"required,min=11,max=11"`
+}
+
+// UserUpdateRequest represents a request to update a user
+type UserUpdateRequest struct {
+	Name   *string `json:"name,omitempty"`
+	Email  *string `json:"email,omitempty"`
+	Mobile *string `json:"mobile,omitempty"`
+	Image  *string `json:"image,omitempty"`
+}
+
+// UserSearchRequest represents a search request for users
+type UserSearchRequest struct {
+	Query    string `json:"query"`
+	Page     int    `json:"page"`
+	PageSize int    `json:"page_size"`
+}
+
+// UserSearchResponse represents a search response for users
+type UserSearchResponse struct {
+	Data       []UserResponse `json:"data"`
+	Pagination PaginationInfo `json:"pagination"`
 }

@@ -186,7 +186,7 @@ func getEnvInt64(key string, defaultValue int64) int64 {
 func (c *Config) GetDSN() string {
 	switch c.Database.Driver {
 	case "mysql":
-		return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local",
+		return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local&multiStatements=true",
 			c.Database.User,
 			c.Database.Password,
 			c.Database.Host,

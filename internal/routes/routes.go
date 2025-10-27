@@ -41,6 +41,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	authService := services.NewAuthService(userRepo, adminRepo, gamenetRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
 	sessionService := services.NewSessionService(sessionRepo, cfg)
 	gamenetService := services.NewGamenetService(gamenetRepo, smsService, emailService)
+	userService := services.NewUserService(userRepo, smsService, emailService)
 	subscriptionPlanService := services.NewSubscriptionPlanService(subscriptionPlanRepo)
 
 	// Initialize file uploader
@@ -53,6 +54,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	notificationHandler := handlers.NewNotificationHandler(
 		notificationService, nil, nil, authService.GetJWTManager())
 	gamenetHandler := handlers.NewGamenetHandler(gamenetService, fileUploader)
+	userHandler := handlers.NewUserHandler(userService)
 	subscriptionPlanHandler := handlers.NewSubscriptionPlanHandler(subscriptionPlanService)
 
 	// API v1 routes
@@ -116,6 +118,20 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 				gamenets.PUT("/:id", gamenetHandler.UpdateGamenet)
 				gamenets.DELETE("/:id", gamenetHandler.DeleteGamenet)
 				gamenets.POST("/:id/resend-credentials", gamenetHandler.ResendCredentials)
+			}
+
+			// User routes
+			users := protected.Group("/users")
+			{
+				users.GET("/", userHandler.GetAllUsers)
+				users.GET("/search-by-identifier", userHandler.SearchUserByIdentifier)
+				users.POST("/", userHandler.CreateUser)
+				users.GET("/:id", userHandler.GetUserByID)
+				users.PUT("/:id", userHandler.UpdateUser)
+				users.DELETE("/:id", userHandler.DeleteUser)
+				users.POST("/:id/resend-credentials", userHandler.ResendCredentials)
+				users.POST("/:id/attach", userHandler.AttachUserToGamenet)
+				users.POST("/:id/detach", userHandler.DetachUserFromGamenet)
 			}
 
 			// Subscription Plan routes

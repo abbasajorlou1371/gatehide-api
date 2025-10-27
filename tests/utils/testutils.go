@@ -133,8 +133,8 @@ func CreateTestUser(t *testing.T, db *sql.DB, email, password, name string) *mod
 	mobile := fmt.Sprintf("+1%09d", len(email)*1000+len(name)+int(time.Now().UnixNano()%1000000))
 
 	query := `
-		INSERT INTO users (name, mobile, email, password, image, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+		INSERT INTO users (name, mobile, email, password, image, balance, debt, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, 0.00, 0.00, NOW(), NOW())
 	`
 
 	result, err := db.Exec(query, name, mobile, email, hashedPassword, nil)
@@ -215,6 +215,8 @@ func runTestMigrations(db *sql.DB) error {
 			email VARCHAR(255) NOT NULL UNIQUE,
 			password VARCHAR(255) NOT NULL,
 			image VARCHAR(500) NULL,
+			balance DECIMAL(10, 2) DEFAULT 0.00 NOT NULL,
+			debt DECIMAL(10, 2) DEFAULT 0.00 NOT NULL,
 			last_login_at TIMESTAMP NULL,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

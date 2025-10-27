@@ -2,19 +2,12 @@
 -- description: Update user_sessions table to support gamenet user type
 
 -- UP
-ALTER TABLE user_sessions 
-MODIFY COLUMN user_type ENUM('user', 'admin', 'gamenet') NOT NULL;
-
--- Remove the foreign key constraint since user_id can now reference multiple tables
-ALTER TABLE user_sessions 
-DROP FOREIGN KEY user_sessions_ibfk_1;
+-- Modify the user_type column to include gamenet
+-- Note: The foreign key was already removed in migration 009
+ALTER TABLE user_sessions MODIFY COLUMN user_type ENUM('user', 'admin', 'gamenet') NOT NULL;
 
 -- DOWN
-ALTER TABLE user_sessions 
-MODIFY COLUMN user_type ENUM('user', 'admin') NOT NULL;
-
--- Re-add the foreign key constraint
-ALTER TABLE user_sessions 
-ADD CONSTRAINT user_sessions_ibfk_1 
-FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+-- Modify the user_type column back to original values
+-- Note: Do not re-add foreign key as it was removed in migration 009
+ALTER TABLE user_sessions MODIFY COLUMN user_type ENUM('user', 'admin') NOT NULL;
 
