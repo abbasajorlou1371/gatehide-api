@@ -32,16 +32,18 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 	notificationRepo := repositories.NewMySQLNotificationRepository(db)
 	gamenetRepo := repositories.NewGamenetRepository(db)
 	subscriptionPlanRepo := repositories.NewSubscriptionPlanRepository(db)
+	permissionRepo := repositories.NewPermissionRepository(db)
 
 	// Initialize services
 	emailService := services.NewEmailService(&cfg.Notification.Email)
 	smsService := services.NewSMSService(&cfg.Notification.SMS)
 	notificationService := services.NewNotificationService(
 		emailService, smsService, nil, nil, notificationRepo, cfg)
-	authService := services.NewAuthService(userRepo, adminRepo, gamenetRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
+	permissionService := services.NewPermissionService(permissionRepo, db)
+	authService := services.NewAuthService(userRepo, adminRepo, gamenetRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, permissionService, cfg)
 	sessionService := services.NewSessionService(sessionRepo, cfg)
-	gamenetService := services.NewGamenetService(gamenetRepo, smsService, emailService)
-	userService := services.NewUserService(userRepo, smsService, emailService)
+	gamenetService := services.NewGamenetService(gamenetRepo, permissionRepo, smsService, emailService)
+	userService := services.NewUserService(userRepo, permissionRepo, smsService, emailService)
 	subscriptionPlanService := services.NewSubscriptionPlanService(subscriptionPlanRepo)
 
 	// Initialize file uploader
@@ -109,66 +111,66 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config, db *sql.DB) {
 				notifications.GET("/:id", notificationHandler.GetNotification)
 			}
 
-			// Gamenet routes
+			// Gamenet routes (admin only)
 			gamenets := protected.Group("/gamenets")
+			gamenets.Use(middlewares.RequirePermission(permissionService, "gamenets", "read"))
 			{
 				gamenets.GET("/", gamenetHandler.GetAllGamenets)
-				gamenets.POST("/", gamenetHandler.CreateGamenet)
+				gamenets.POST("/", middlewares.RequirePermission(permissionService, "gamenets", "create"), gamenetHandler.CreateGamenet)
 				gamenets.GET("/:id", gamenetHandler.GetGamenetByID)
-				gamenets.PUT("/:id", gamenetHandler.UpdateGamenet)
-				gamenets.DELETE("/:id", gamenetHandler.DeleteGamenet)
-				gamenets.POST("/:id/resend-credentials", gamenetHandler.ResendCredentials)
+				gamenets.PUT("/:id", middlewares.RequirePermission(permissionService, "gamenets", "update"), gamenetHandler.UpdateGamenet)
+				gamenets.DELETE("/:id", middlewares.RequirePermission(permissionService, "gamenets", "delete"), gamenetHandler.DeleteGamenet)
+				gamenets.POST("/:id/resend-credentials", middlewares.RequirePermission(permissionService, "gamenets", "update"), gamenetHandler.ResendCredentials)
 			}
 
-			// User routes
+			// User routes (gamenets can manage their users, admins can manage all)
 			users := protected.Group("/users")
+			users.Use(middlewares.RequirePermission(permissionService, "users", "read"))
 			{
 				users.GET("/", userHandler.GetAllUsers)
 				users.GET("/search-by-identifier", userHandler.SearchUserByIdentifier)
-				users.POST("/", userHandler.CreateUser)
-				users.GET("/:id", userHandler.GetUserByID)
-				users.PUT("/:id", userHandler.UpdateUser)
-				users.DELETE("/:id", userHandler.DeleteUser)
-				users.POST("/:id/resend-credentials", userHandler.ResendCredentials)
-				users.POST("/:id/attach", userHandler.AttachUserToGamenet)
-				users.POST("/:id/detach", userHandler.DetachUserFromGamenet)
+				users.POST("/", middlewares.RequirePermission(permissionService, "users", "create"), userHandler.CreateUser)
+				users.GET("/:id", middlewares.RequireResourceOwnership(permissionService, "users"), userHandler.GetUserByID)
+				users.PUT("/:id", middlewares.RequirePermissionAndOwnership(permissionService, "users", "update"), userHandler.UpdateUser)
+				users.DELETE("/:id", middlewares.RequirePermissionAndOwnership(permissionService, "users", "delete"), userHandler.DeleteUser)
+				users.POST("/:id/resend-credentials", middlewares.RequirePermissionAndOwnership(permissionService, "users", "update"), userHandler.ResendCredentials)
+				users.POST("/:id/attach", middlewares.RequirePermission(permissionService, "users", "update"), userHandler.AttachUserToGamenet)
+				users.POST("/:id/detach", middlewares.RequirePermission(permissionService, "users", "update"), userHandler.DetachUserFromGamenet)
 			}
 
-			// Subscription Plan routes
+			// Subscription Plan routes (admin only)
 			plans := protected.Group("/subscription-plans")
+			plans.Use(middlewares.RequirePermission(permissionService, "subscription_plans", "read"))
 			{
 				plans.GET("/", subscriptionPlanHandler.GetAllPlans)
-				plans.POST("/", subscriptionPlanHandler.CreatePlan)
+				plans.POST("/", middlewares.RequirePermission(permissionService, "subscription_plans", "create"), subscriptionPlanHandler.CreatePlan)
 				plans.GET("/:id", subscriptionPlanHandler.GetPlan)
-				plans.PUT("/:id", subscriptionPlanHandler.UpdatePlan)
-				plans.DELETE("/:id", subscriptionPlanHandler.DeletePlan)
+				plans.PUT("/:id", middlewares.RequirePermission(permissionService, "subscription_plans", "update"), subscriptionPlanHandler.UpdatePlan)
+				plans.DELETE("/:id", middlewares.RequirePermission(permissionService, "subscription_plans", "delete"), subscriptionPlanHandler.DeletePlan)
 			}
 
-			// Admin-only routes
+			// Dashboard routes with permission checks
 			admin := protected.Group("/admin")
-			admin.Use(middlewares.AdminMiddleware())
+			admin.Use(middlewares.RequirePermission(permissionService, "dashboard", "view"))
 			{
-				// Add admin-specific routes here
 				admin.GET("/dashboard", func(c *gin.Context) {
 					c.JSON(200, gin.H{"message": "Admin dashboard", "user": c.GetString("user_name")})
 				})
 			}
 
-			// User-only routes
+			// User dashboard routes
 			user := protected.Group("/user")
-			user.Use(middlewares.UserMiddleware())
+			user.Use(middlewares.RequirePermission(permissionService, "dashboard", "view"))
 			{
-				// Add user-specific routes here
 				user.GET("/dashboard", func(c *gin.Context) {
 					c.JSON(200, gin.H{"message": "User dashboard", "user": c.GetString("user_name")})
 				})
 			}
 
-			// Gamenet-only routes
+			// Gamenet dashboard routes
 			gamenet := protected.Group("/gamenet")
-			gamenet.Use(middlewares.GamenetMiddleware())
+			gamenet.Use(middlewares.RequirePermission(permissionService, "dashboard", "view"))
 			{
-				// Add gamenet-specific routes here
 				gamenet.GET("/dashboard", func(c *gin.Context) {
 					c.JSON(200, gin.H{"message": "Gamenet dashboard", "gamenet": c.GetString("user_name")})
 				})

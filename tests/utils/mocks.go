@@ -280,6 +280,22 @@ func (m *MockAuthService) CheckEmailExists(email string) (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
+func (m *MockAuthService) GetUserPermissions(userType string) ([]string, error) {
+	args := m.Called(userType)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockAuthService) GetUserPermissionsByID(userID int, userType string) ([]string, error) {
+	args := m.Called(userID, userType)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
 // MockSessionRepository is a mock implementation of SessionRepositoryInterface
 type MockSessionRepository struct {
 	mock.Mock

@@ -11,17 +11,19 @@ import (
 
 // gamenetService implements GamenetServiceInterface
 type gamenetService struct {
-	gamenetRepo  repositories.GamenetRepository
-	smsService   *SMSService
-	emailService *EmailService
+	gamenetRepo    repositories.GamenetRepository
+	permissionRepo repositories.PermissionRepositoryInterface
+	smsService     *SMSService
+	emailService   *EmailService
 }
 
 // NewGamenetService creates a new gamenet service
-func NewGamenetService(gamenetRepo repositories.GamenetRepository, smsService *SMSService, emailService *EmailService) GamenetServiceInterface {
+func NewGamenetService(gamenetRepo repositories.GamenetRepository, permissionRepo repositories.PermissionRepositoryInterface, smsService *SMSService, emailService *EmailService) GamenetServiceInterface {
 	return &gamenetService{
-		gamenetRepo:  gamenetRepo,
-		smsService:   smsService,
-		emailService: emailService,
+		gamenetRepo:    gamenetRepo,
+		permissionRepo: permissionRepo,
+		smsService:     smsService,
+		emailService:   emailService,
 	}
 }
 
@@ -78,6 +80,13 @@ func (s *gamenetService) Create(ctx context.Context, req *models.GamenetCreateRe
 	err = s.gamenetRepo.Create(gamenet)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gamenet: %w", err)
+	}
+
+	// Assign gamenet role to the newly created gamenet
+	err = s.permissionRepo.AssignRoleToUser(gamenet.ID, "gamenet", "gamenet")
+	if err != nil {
+		// Log error but don't fail creation
+		fmt.Printf("Warning: Failed to assign gamenet role to gamenet %d: %v\n", gamenet.ID, err)
 	}
 
 	// Send credentials via SMS using Kavenegar Verify Lookup

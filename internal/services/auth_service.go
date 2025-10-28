@@ -23,6 +23,7 @@ type AuthService struct {
 	sessionRepo           repositories.SessionRepositoryInterface
 	emailVerificationRepo *repositories.EmailVerificationRepository
 	notificationService   NotificationServiceInterface
+	permissionService     PermissionServiceInterface
 	jwtManager            *utils.JWTManager
 	config                *config.Config
 }
@@ -36,6 +37,7 @@ func NewAuthService(
 	sessionRepo repositories.SessionRepositoryInterface,
 	emailVerificationRepo *repositories.EmailVerificationRepository,
 	notificationService NotificationServiceInterface,
+	permissionService PermissionServiceInterface,
 	cfg *config.Config,
 ) *AuthService {
 	return &AuthService{
@@ -46,6 +48,7 @@ func NewAuthService(
 		sessionRepo:           sessionRepo,
 		emailVerificationRepo: emailVerificationRepo,
 		notificationService:   notificationService,
+		permissionService:     permissionService,
 		jwtManager:            utils.NewJWTManager(cfg),
 		config:                cfg,
 	}
@@ -124,11 +127,19 @@ func (s *AuthService) Login(email, password string, rememberMe bool) (*models.Lo
 			// Calculate token expiration
 			expiresAt := time.Now().Add(time.Duration(s.config.Security.JWTExpiration) * time.Hour)
 
+			// Get user permissions
+			permissions, err := s.permissionService.GetUserPermissionsByID(user.ID, "user")
+			if err != nil {
+				fmt.Printf("Warning: failed to get user permissions: %v\n", err)
+				permissions = []string{} // Default to empty permissions
+			}
+
 			return &models.LoginResponse{
-				Token:     token,
-				UserType:  "user",
-				User:      user.ToResponse(),
-				ExpiresAt: expiresAt,
+				Token:       token,
+				UserType:    "user",
+				User:        user.ToResponse(),
+				Permissions: permissions,
+				ExpiresAt:   expiresAt,
 			}, nil
 		}
 	}
@@ -152,11 +163,19 @@ func (s *AuthService) Login(email, password string, rememberMe bool) (*models.Lo
 			// Calculate token expiration
 			expiresAt := time.Now().Add(time.Duration(s.config.Security.JWTExpiration) * time.Hour)
 
+			// Get admin permissions
+			permissions, err := s.permissionService.GetUserPermissionsByID(admin.ID, "admin")
+			if err != nil {
+				fmt.Printf("Warning: failed to get admin permissions: %v\n", err)
+				permissions = []string{} // Default to empty permissions
+			}
+
 			return &models.LoginResponse{
-				Token:     token,
-				UserType:  "admin",
-				User:      admin.ToResponse(),
-				ExpiresAt: expiresAt,
+				Token:       token,
+				UserType:    "admin",
+				User:        admin.ToResponse(),
+				Permissions: permissions,
+				ExpiresAt:   expiresAt,
 			}, nil
 		}
 	}
@@ -180,11 +199,19 @@ func (s *AuthService) Login(email, password string, rememberMe bool) (*models.Lo
 			// Calculate token expiration
 			expiresAt := time.Now().Add(time.Duration(s.config.Security.JWTExpiration) * time.Hour)
 
+			// Get gamenet permissions
+			permissions, err := s.permissionService.GetUserPermissionsByID(gamenet.ID, "gamenet")
+			if err != nil {
+				fmt.Printf("Warning: failed to get gamenet permissions: %v\n", err)
+				permissions = []string{} // Default to empty permissions
+			}
+
 			return &models.LoginResponse{
-				Token:     token,
-				UserType:  "gamenet",
-				User:      gamenet.ToResponse(),
-				ExpiresAt: expiresAt,
+				Token:       token,
+				UserType:    "gamenet",
+				User:        gamenet.ToResponse(),
+				Permissions: permissions,
+				ExpiresAt:   expiresAt,
 			}, nil
 		}
 	}
@@ -370,6 +397,16 @@ func (s *AuthService) UpdateGamenetEmail(gamenetID int, newEmail string) (*model
 
 	response := updatedGamenet.ToResponse()
 	return &response, nil
+}
+
+// GetUserPermissionsByID retrieves permissions for a specific user
+func (s *AuthService) GetUserPermissionsByID(userID int, userType string) ([]string, error) {
+	return s.permissionService.GetUserPermissionsByID(userID, userType)
+}
+
+// GetUserPermissions retrieves permissions for a user type
+func (s *AuthService) GetUserPermissions(userType string) ([]string, error) {
+	return s.permissionService.GetUserPermissions(userType)
 }
 
 // GetJWTManager returns the JWT manager instance

@@ -28,4 +28,6 @@ type AuthServiceInterface interface {
 	SendEmailVerification(userID int, userType, newEmail string) (string, error)
 	VerifyEmailCode(userID int, userType, email, code string) (bool, error)
 	CheckEmailExists(email string) (bool, error)
+	GetUserPermissions(userType string) ([]string, error)
+	GetUserPermissionsByID(userID int, userType string) ([]string, error)
 }

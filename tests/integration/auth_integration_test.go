@@ -95,9 +95,18 @@ func TestAuthenticationIntegration_UserLogin(t *testing.T) {
 				assert.Contains(t, data, "token")
 				assert.Contains(t, data, "user_type")
 				assert.Contains(t, data, "user")
+				assert.Contains(t, data, "permissions")
 				assert.Contains(t, data, "expires_at")
 
 				assert.Equal(t, "user", data["user_type"])
+
+				// Check that permissions is an array (can be empty)
+				if permissions, exists := data["permissions"]; exists {
+					if permissions != nil {
+						permissionsArray := permissions.([]interface{})
+						assert.NotNil(t, permissionsArray)
+					}
+				}
 
 				user := data["user"].(map[string]interface{})
 				assert.Equal(t, testUser.ID, int(user["id"].(float64)))
@@ -175,9 +184,18 @@ func TestAuthenticationIntegration_AdminLogin(t *testing.T) {
 				assert.Contains(t, data, "token")
 				assert.Contains(t, data, "user_type")
 				assert.Contains(t, data, "user")
+				assert.Contains(t, data, "permissions")
 				assert.Contains(t, data, "expires_at")
 
 				assert.Equal(t, "admin", data["user_type"])
+
+				// Check that permissions is an array (can be empty)
+				if permissions, exists := data["permissions"]; exists {
+					if permissions != nil {
+						permissionsArray := permissions.([]interface{})
+						assert.NotNil(t, permissionsArray)
+					}
+				}
 
 				user := data["user"].(map[string]interface{})
 				assert.Equal(t, testAdmin.ID, int(user["id"].(float64)))
@@ -202,7 +220,10 @@ func TestAuthenticationIntegration_ProtectedRoutes(t *testing.T) {
 
 	// Setup test data with unique emails
 	_ = testutils.CreateTestUser(t, db, "user2@example.com", "password123", "Test User 2")
-	_ = testutils.CreateTestAdmin(t, db, "admin2@example.com", "admin123", "Test Admin 2")
+	admin := testutils.CreateTestAdmin(t, db, "admin2@example.com", "admin123", "Test Admin 2")
+
+	// Assign administrator role to admin
+	assignAdministratorRole(t, db, admin.ID)
 
 	// Setup application
 	cfg := testutils.TestConfig()
@@ -431,12 +452,14 @@ func setupTestRouter(cfg *config.Config, db *sql.DB) *gin.Engine {
 	sessionRepo := repositories.NewSessionRepository(db)
 	emailVerificationRepo := repositories.NewEmailVerificationRepository(db)
 	notificationService := &testutils.MockNotificationService{}
+	permissionRepo := repositories.NewPermissionRepository(db)
 
 	// Initialize file uploader
 	fileUploader := utils.NewFileUploader(&cfg.FileStorage)
 
 	// Initialize services
-	authService := services.NewAuthService(userRepo, adminRepo, gamenetRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, cfg)
+	permissionService := services.NewPermissionService(permissionRepo, db)
+	authService := services.NewAuthService(userRepo, adminRepo, gamenetRepo, passwordResetRepo, sessionRepo, emailVerificationRepo, notificationService, permissionService, cfg)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(cfg)
@@ -483,6 +506,29 @@ func setupTestRouter(cfg *config.Config, db *sql.DB) *gin.Engine {
 	}
 
 	return router
+}
+
+// assignAdministratorRole assigns the administrator role to an admin
+func assignAdministratorRole(t *testing.T, db *sql.DB, adminID int) {
+	// First get the administrator role ID
+	var roleID int
+	roleQuery := "SELECT id FROM roles WHERE name = 'administrator'"
+	err := db.QueryRow(roleQuery).Scan(&roleID)
+	if err != nil {
+		t.Fatalf("Failed to get administrator role: %v", err)
+	}
+
+	// Insert the role assignment
+	assignQuery := `
+		INSERT INTO user_roles (user_id, user_type, role_id, created_at, updated_at)
+		VALUES (?, 'admin', ?, NOW(), NOW())
+		ON DUPLICATE KEY UPDATE updated_at = NOW()
+	`
+
+	_, err = db.Exec(assignQuery, adminID, roleID)
+	if err != nil {
+		t.Fatalf("Failed to assign administrator role: %v", err)
+	}
 }
 
 func getAuthToken(t *testing.T, router *gin.Engine, email, password string) string {

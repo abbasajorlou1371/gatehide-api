@@ -11,17 +11,19 @@ import (
 
 // userService implements UserServiceInterface
 type userService struct {
-	userRepo     repositories.UserRepository
-	smsService   *SMSService
-	emailService *EmailService
+	userRepo       repositories.UserRepository
+	permissionRepo repositories.PermissionRepositoryInterface
+	smsService     *SMSService
+	emailService   *EmailService
 }
 
 // NewUserService creates a new user service
-func NewUserService(userRepo repositories.UserRepository, smsService *SMSService, emailService *EmailService) UserServiceInterface {
+func NewUserService(userRepo repositories.UserRepository, permissionRepo repositories.PermissionRepositoryInterface, smsService *SMSService, emailService *EmailService) UserServiceInterface {
 	return &userService{
-		userRepo:     userRepo,
-		smsService:   smsService,
-		emailService: emailService,
+		userRepo:       userRepo,
+		permissionRepo: permissionRepo,
+		smsService:     smsService,
+		emailService:   emailService,
 	}
 }
 
@@ -124,6 +126,13 @@ func (s *userService) Create(ctx context.Context, req *models.UserCreateRequest,
 	err = s.userRepo.Create(user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	// Assign user role to the newly created user
+	err = s.permissionRepo.AssignRoleToUser(user.ID, "user", "user")
+	if err != nil {
+		// Log error but don't fail creation
+		fmt.Printf("Warning: Failed to assign user role to user %d: %v\n", user.ID, err)
 	}
 
 	// Link user to gamenet if gamenetID is provided

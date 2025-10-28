@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gatehide/gatehide-api/config"
 	"github.com/gatehide/gatehide-api/internal/models"
 	"github.com/gatehide/gatehide-api/internal/repositories"
 	"github.com/gatehide/gatehide-api/internal/routes"
+	testutils "github.com/gatehide/gatehide-api/tests/utils"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
@@ -28,36 +30,11 @@ type UserIntegrationTestSuite struct {
 }
 
 func (suite *UserIntegrationTestSuite) SetupSuite() {
-	// Load test configuration
-	suite.cfg = &config.Config{
-		Database: config.DatabaseConfig{
-			Host:     "localhost",
-			Port:     "3306",
-			User:     "root",
-			Password: "",
-			DBName:   "gatehide_test",
-			Driver:   "mysql",
-		},
-		Security: config.SecurityConfig{
-			JWTSecret:     "test-jwt-secret",
-			JWTExpiration: 24,
-		},
-		Notification: config.NotificationConfig{
-			Email: config.EmailConfig{Enabled: false},
-			SMS:   config.SMSConfig{Enabled: false},
-		},
-		FileStorage: config.FileStorageConfig{
-			UploadPath: "./uploads",
-			PublicURL:  "http://localhost:8080",
-		},
-	}
+	// Use testutils for proper database setup
+	suite.db = testutils.SetupTestDB(suite.T())
 
-	// Connect to database
-	db, err := sql.Open("mysql", suite.cfg.GetDSN())
-	if err != nil {
-		suite.T().Fatalf("Failed to connect to database: %v", err)
-	}
-	suite.db = db
+	// Load test configuration
+	suite.cfg = testutils.TestConfig()
 
 	// Set Gin to test mode
 	gin.SetMode(gin.TestMode)
@@ -72,16 +49,29 @@ func (suite *UserIntegrationTestSuite) SetupSuite() {
 
 func (suite *UserIntegrationTestSuite) TearDownSuite() {
 	if suite.db != nil {
+		// Clean up admin users created during tests
+		_, err := suite.db.Exec("DELETE FROM admins WHERE email LIKE 'admin%@test.com'")
+		if err != nil {
+			suite.T().Logf("Warning: Failed to clean admin users: %v", err)
+		}
 		suite.db.Close()
 	}
 }
 
 func (suite *UserIntegrationTestSuite) SetupTest() {
-	// Clean up users table before each test
+	// Clean up users and admins tables before each test
 	_, err := suite.db.Exec("DELETE FROM users WHERE email LIKE 'test%@example.com'")
 	if err != nil {
 		suite.T().Fatalf("Failed to clean users table: %v", err)
 	}
+
+	_, err = suite.db.Exec("DELETE FROM admins WHERE email LIKE 'admin%@test.com'")
+	if err != nil {
+		suite.T().Fatalf("Failed to clean admins table: %v", err)
+	}
+
+	// Refresh token for each test to ensure it's valid
+	suite.token = suite.getAuthToken()
 }
 
 func (suite *UserIntegrationTestSuite) TearDownTest() {
@@ -93,18 +83,26 @@ func (suite *UserIntegrationTestSuite) TearDownTest() {
 }
 
 func (suite *UserIntegrationTestSuite) getAuthToken() string {
-	// Create a test admin user first
+	// Create a test admin user first with unique email and mobile
+	adminEmail := fmt.Sprintf("admin%d@test.com", time.Now().UnixNano())
+	adminMobile := fmt.Sprintf("0912345%05d", time.Now().UnixNano()%1000000)
 	hashedPassword, _ := models.HashPassword("adminpass")
-	_, err := suite.db.Exec("INSERT INTO admins (name, email, mobile, password) VALUES (?, ?, ?, ?)",
-		"Test Admin", "admin@test.com", "09123456789", hashedPassword)
+	result, err := suite.db.Exec("INSERT INTO admins (name, email, mobile, password) VALUES (?, ?, ?, ?)",
+		"Test Admin", adminEmail, adminMobile, hashedPassword)
 	if err != nil {
-		// Admin might already exist, that's ok
-		suite.T().Logf("Admin might already exist: %v", err)
+		suite.T().Fatalf("Failed to create admin user: %v", err)
 	}
+
+	// Get the newly created admin ID
+	adminID, err := result.LastInsertId()
+	if err != nil {
+		suite.T().Fatalf("Failed to get admin ID: %v", err)
+	}
+	suite.assignAdministratorRole(int(adminID))
 
 	// Login as admin to get token
 	loginData := map[string]interface{}{
-		"email":    "admin@test.com",
+		"email":    adminEmail,
 		"password": "adminpass",
 	}
 
@@ -124,6 +122,29 @@ func (suite *UserIntegrationTestSuite) getAuthToken() string {
 
 	data := response["data"].(map[string]interface{})
 	return data["token"].(string)
+}
+
+// assignAdministratorRole assigns the administrator role to an admin
+func (suite *UserIntegrationTestSuite) assignAdministratorRole(adminID int) {
+	// First get the administrator role ID
+	var roleID int
+	roleQuery := "SELECT id FROM roles WHERE name = 'administrator'"
+	err := suite.db.QueryRow(roleQuery).Scan(&roleID)
+	if err != nil {
+		suite.T().Fatalf("Failed to get administrator role: %v", err)
+	}
+
+	// Insert the role assignment
+	assignQuery := `
+		INSERT INTO user_roles (user_id, user_type, role_id, created_at, updated_at)
+		VALUES (?, 'admin', ?, NOW(), NOW())
+		ON DUPLICATE KEY UPDATE updated_at = NOW()
+	`
+
+	_, err = suite.db.Exec(assignQuery, adminID, roleID)
+	if err != nil {
+		suite.T().Fatalf("Failed to assign administrator role: %v", err)
+	}
 }
 
 func (suite *UserIntegrationTestSuite) TestCreateUser() {

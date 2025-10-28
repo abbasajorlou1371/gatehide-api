@@ -34,10 +34,11 @@ func TestAuthHandler_Login(t *testing.T) {
 			},
 			mockSetup: func(m *testutils.MockAuthService) {
 				response := &models.LoginResponse{
-					Token:     "valid.jwt.token",
-					UserType:  "user",
-					User:      models.UserResponse{ID: 1, Email: "user@example.com", Name: "Test User"},
-					ExpiresAt: time.Now().Add(24 * time.Hour),
+					Token:       "valid.jwt.token",
+					UserType:    "user",
+					User:        models.UserResponse{ID: 1, Email: "user@example.com", Name: "Test User"},
+					Permissions: []string{"reservation:manage", "support:access", "settings:manage", "wallet:view"},
+					ExpiresAt:   time.Now().Add(24 * time.Hour),
 				}
 				m.On("LoginWithSession", "user@example.com", "password123", false, "", "192.0.2.1", "").Return(response, nil)
 			},
@@ -52,10 +53,11 @@ func TestAuthHandler_Login(t *testing.T) {
 			},
 			mockSetup: func(m *testutils.MockAuthService) {
 				response := &models.LoginResponse{
-					Token:     "valid.jwt.token",
-					UserType:  "admin",
-					User:      models.AdminResponse{ID: 1, Email: "admin@example.com", Name: "Test Admin"},
-					ExpiresAt: time.Now().Add(24 * time.Hour),
+					Token:       "valid.jwt.token",
+					UserType:    "admin",
+					User:        models.AdminResponse{ID: 1, Email: "admin@example.com", Name: "Test Admin"},
+					Permissions: []string{"dashboard:view", "gamenets:create", "gamenets:read", "gamenets:update", "gamenets:delete", "subscription_plans:create", "subscription_plans:read", "subscription_plans:update", "subscription_plans:delete", "analytics:view", "payments:view", "transactions:view", "invoices:view", "settings:manage", "support:access"},
+					ExpiresAt:   time.Now().Add(24 * time.Hour),
 				}
 				m.On("LoginWithSession", "admin@example.com", "admin123", false, "", "192.0.2.1", "").Return(response, nil)
 			},
@@ -299,6 +301,7 @@ func TestAuthHandler_GetProfile(t *testing.T) {
 					Email: "user@example.com",
 				}
 				mockService.On("GetUserByID", 1).Return(mockUser, nil)
+				mockService.On("GetUserPermissionsByID", 1, "user").Return([]string{"reservation:manage", "support:access", "settings:manage", "wallet:view"}, nil)
 			}
 
 			cfg := testutils.TestConfig()

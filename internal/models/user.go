@@ -43,10 +43,11 @@ type LoginRequest struct {
 
 // LoginResponse represents a login response
 type LoginResponse struct {
-	Token     string      `json:"token"`
-	UserType  string      `json:"user_type"`
-	User      interface{} `json:"user"`
-	ExpiresAt time.Time   `json:"expires_at"`
+	Token       string      `json:"token"`
+	UserType    string      `json:"user_type"`
+	User        interface{} `json:"user"`
+	Permissions []string    `json:"permissions"`
+	ExpiresAt   time.Time   `json:"expires_at"`
 }
 
 // UserResponse represents a user response without sensitive data
@@ -73,6 +74,13 @@ type AdminResponse struct {
 	LastLoginAt *time.Time `json:"last_login_at"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+// ProfileResponse represents a profile response with permissions
+type ProfileResponse struct {
+	User        interface{} `json:"user"`
+	UserType    string      `json:"user_type"`
+	Permissions []string    `json:"permissions"`
 }
 
 // ToResponse converts User to UserResponse

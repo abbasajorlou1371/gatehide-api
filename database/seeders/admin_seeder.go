@@ -98,7 +98,38 @@ func (s *AdminSeeder) seedAdmin(admin AdminData) error {
 		return fmt.Errorf("failed to get last insert id: %w", err)
 	}
 
+	// Assign administrator role to the newly created admin
+	err = s.assignAdministratorRole(int(adminID))
+	if err != nil {
+		log.Printf("Warning: Failed to assign administrator role to admin %d: %v", adminID, err)
+	}
+
 	log.Printf("✅ Admin seeded successfully with ID: %d", adminID)
+	return nil
+}
+
+// assignAdministratorRole assigns the administrator role to an admin
+func (s *AdminSeeder) assignAdministratorRole(adminID int) error {
+	// First get the administrator role ID
+	var roleID int
+	roleQuery := "SELECT id FROM roles WHERE name = 'administrator'"
+	err := s.db.QueryRow(roleQuery).Scan(&roleID)
+	if err != nil {
+		return fmt.Errorf("failed to get administrator role: %w", err)
+	}
+
+	// Insert the role assignment
+	assignQuery := `
+		INSERT INTO user_roles (user_id, user_type, role_id, created_at, updated_at)
+		VALUES (?, 'admin', ?, NOW(), NOW())
+		ON DUPLICATE KEY UPDATE updated_at = NOW()
+	`
+
+	_, err = s.db.Exec(assignQuery, adminID, roleID)
+	if err != nil {
+		return fmt.Errorf("failed to assign administrator role: %w", err)
+	}
+
 	return nil
 }
 

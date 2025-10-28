@@ -79,6 +79,10 @@ func CleanupTestDB(t *testing.T, db *sql.DB) {
 
 	// Clean up test data in reverse order to avoid foreign key constraints
 	queries := []string{
+		"DELETE FROM user_roles",
+		"DELETE FROM role_permissions",
+		"DELETE FROM permissions",
+		"DELETE FROM roles",
 		"DELETE FROM user_sessions",
 		"DELETE FROM users",
 		"DELETE FROM admins",
@@ -101,13 +105,24 @@ func CleanupTestDBForce(t *testing.T, db *sql.DB) {
 		return
 	}
 
+	// Disable foreign key checks temporarily to avoid constraint issues
+	db.Exec("SET FOREIGN_KEY_CHECKS = 0")
+
 	// Clean up test data and reset auto-increment
 	queries := []string{
+		"DELETE FROM user_roles",
+		"DELETE FROM role_permissions",
+		"DELETE FROM permissions",
+		"DELETE FROM roles",
 		"DELETE FROM user_sessions",
 		"DELETE FROM users",
 		"DELETE FROM admins",
 		"DELETE FROM gamenets",
 		"DELETE FROM migrations",
+		"ALTER TABLE user_roles AUTO_INCREMENT = 1",
+		"ALTER TABLE role_permissions AUTO_INCREMENT = 1",
+		"ALTER TABLE permissions AUTO_INCREMENT = 1",
+		"ALTER TABLE roles AUTO_INCREMENT = 1",
 		"ALTER TABLE user_sessions AUTO_INCREMENT = 1",
 		"ALTER TABLE users AUTO_INCREMENT = 1",
 		"ALTER TABLE admins AUTO_INCREMENT = 1",
@@ -120,6 +135,9 @@ func CleanupTestDBForce(t *testing.T, db *sql.DB) {
 			log.Printf("Warning: failed to clean up test data: %v", err)
 		}
 	}
+
+	// Re-enable foreign key checks
+	db.Exec("SET FOREIGN_KEY_CHECKS = 1")
 }
 
 // CreateTestUser creates a test user in the database
@@ -130,7 +148,7 @@ func CreateTestUser(t *testing.T, db *sql.DB, email, password, name string) *mod
 	}
 
 	// Generate unique mobile number based on email hash and timestamp
-	mobile := fmt.Sprintf("+1%09d", len(email)*1000+len(name)+int(time.Now().UnixNano()%1000000))
+	mobile := fmt.Sprintf("+1%09d", len(email)*1000+len(name)+int(time.Now().UnixNano()%10000000))
 
 	query := `
 		INSERT INTO users (name, mobile, email, password, image, balance, debt, created_at, updated_at)
@@ -164,7 +182,7 @@ func CreateTestAdmin(t *testing.T, db *sql.DB, email, password, name string) *mo
 	}
 
 	// Generate unique mobile number based on email hash and timestamp
-	mobile := fmt.Sprintf("+1%09d", len(email)*2000+len(name)+int(time.Now().UnixNano()%1000000))
+	mobile := fmt.Sprintf("+1%09d", len(email)*2000+len(name)+int(time.Now().UnixNano()%10000000))
 
 	query := `
 		INSERT INTO admins (name, mobile, email, password, image, created_at, updated_at)
@@ -304,6 +322,156 @@ func runTestMigrations(db *sql.DB) error {
 
 	if _, err := db.Exec(userSessionsTable); err != nil {
 		return fmt.Errorf("failed to create user_sessions table: %w", err)
+	}
+
+	// Create permissions tables for RBAC
+	permissionsTable := `
+		CREATE TABLE IF NOT EXISTS permissions (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			name VARCHAR(100) NOT NULL UNIQUE,
+			description TEXT,
+			resource VARCHAR(50) NOT NULL,
+			action VARCHAR(50) NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			
+			INDEX idx_resource_action (resource, action),
+			INDEX idx_name (name)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+	`
+
+	if _, err := db.Exec(permissionsTable); err != nil {
+		return fmt.Errorf("failed to create permissions table: %w", err)
+	}
+
+	rolesTable := `
+		CREATE TABLE IF NOT EXISTS roles (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			name VARCHAR(50) NOT NULL UNIQUE,
+			description TEXT,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			
+			INDEX idx_name (name)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+	`
+
+	if _, err := db.Exec(rolesTable); err != nil {
+		return fmt.Errorf("failed to create roles table: %w", err)
+	}
+
+	rolePermissionsTable := `
+		CREATE TABLE IF NOT EXISTS role_permissions (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			role_id INT NOT NULL,
+			permission_id INT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			
+			FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+			FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE,
+			
+			UNIQUE KEY unique_role_permission (role_id, permission_id),
+			INDEX idx_role_id (role_id),
+			INDEX idx_permission_id (permission_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+	`
+
+	if _, err := db.Exec(rolePermissionsTable); err != nil {
+		return fmt.Errorf("failed to create role_permissions table: %w", err)
+	}
+
+	// Create user_roles table
+	userRolesTable := `
+		CREATE TABLE IF NOT EXISTS user_roles (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			user_id INT NOT NULL,
+			user_type ENUM('user', 'admin', 'gamenet') NOT NULL,
+			role_id INT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			
+			FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+			
+			UNIQUE KEY unique_user_role (user_id, user_type, role_id),
+			INDEX idx_user_id_type (user_id, user_type),
+			INDEX idx_role_id (role_id),
+			INDEX idx_user_type (user_type)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+	`
+
+	if _, err := db.Exec(userRolesTable); err != nil {
+		return fmt.Errorf("failed to create user_roles table: %w", err)
+	}
+
+	// Insert roles
+	roles := []string{
+		"INSERT IGNORE INTO roles (name, description) VALUES ('administrator', 'System administrator with full access')",
+		"INSERT IGNORE INTO roles (name, description) VALUES ('gamenet', 'Gaming center operator with limited access')",
+		"INSERT IGNORE INTO roles (name, description) VALUES ('user', 'Regular user with basic access')",
+	}
+
+	for _, roleQuery := range roles {
+		if _, err := db.Exec(roleQuery); err != nil {
+			return fmt.Errorf("failed to insert role: %w", err)
+		}
+	}
+
+	// Insert permissions
+	permissions := []string{
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('dashboard:view', 'View dashboard', 'dashboard', 'view')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('gamenets:create', 'Create gamenets', 'gamenets', 'create')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('gamenets:read', 'View gamenets', 'gamenets', 'read')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('gamenets:update', 'Update gamenets', 'gamenets', 'update')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('gamenets:delete', 'Delete gamenets', 'gamenets', 'delete')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('users:create', 'Create users', 'users', 'create')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('users:read', 'View users', 'users', 'read')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('users:update', 'Update users', 'users', 'update')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('users:delete', 'Delete users', 'users', 'delete')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('subscription_plans:create', 'Create subscription plans', 'subscription_plans', 'create')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('subscription_plans:read', 'View subscription plans', 'subscription_plans', 'read')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('subscription_plans:update', 'Update subscription plans', 'subscription_plans', 'update')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('subscription_plans:delete', 'Delete subscription plans', 'subscription_plans', 'delete')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('analytics:view', 'View analytics', 'analytics', 'view')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('payments:view', 'View payments', 'payments', 'view')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('transactions:view', 'View transactions', 'transactions', 'view')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('invoices:view', 'View invoices', 'invoices', 'view')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('settings:manage', 'Manage settings', 'settings', 'manage')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('support:access', 'Access support', 'support', 'access')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('reservation:manage', 'Manage reservations', 'reservation', 'manage')",
+		"INSERT IGNORE INTO permissions (name, description, resource, action) VALUES ('wallet:view', 'View wallet', 'wallet', 'view')",
+	}
+
+	for _, permQuery := range permissions {
+		if _, err := db.Exec(permQuery); err != nil {
+			return fmt.Errorf("failed to insert permission: %w", err)
+		}
+	}
+
+	// Assign permissions to roles - use individual transactions to avoid deadlocks
+	rolePermissions := []string{
+		// Administrator permissions
+		"INSERT IGNORE INTO role_permissions (role_id, permission_id) SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'administrator' AND p.name IN ('dashboard:view', 'gamenets:create', 'gamenets:read', 'gamenets:update', 'gamenets:delete', 'users:create', 'users:read', 'users:update', 'users:delete', 'subscription_plans:create', 'subscription_plans:read', 'subscription_plans:update', 'subscription_plans:delete', 'analytics:view', 'payments:view', 'transactions:view', 'invoices:view', 'settings:manage', 'support:access')",
+		// Gamenet permissions
+		"INSERT IGNORE INTO role_permissions (role_id, permission_id) SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'gamenet' AND p.name IN ('dashboard:view', 'users:create', 'users:read', 'users:update', 'users:delete', 'analytics:view', 'transactions:view', 'payments:view', 'support:access', 'settings:manage')",
+		// User permissions
+		"INSERT IGNORE INTO role_permissions (role_id, permission_id) SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'user' AND p.name IN ('reservation:manage', 'support:access', 'settings:manage', 'wallet:view')",
+	}
+
+	for _, rpQuery := range rolePermissions {
+		// Use individual transactions to avoid deadlocks
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+
+		if _, err := tx.Exec(rpQuery); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to assign role permissions: %w", err)
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit role permissions transaction: %w", err)
+		}
 	}
 
 	return nil

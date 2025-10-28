@@ -247,7 +247,7 @@ func (s *SMSService) TestConnection(ctx context.Context) error {
 	}
 
 	// Set timeout for the request
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	_, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	// Try to get account info to test the connection
@@ -343,6 +343,7 @@ func (s *SMSService) SendGamenetCredentials(ctx context.Context, mobile, email, 
 
 // sendCredentialsViaSMS sends credentials using regular SMS (fallback method)
 func (s *SMSService) sendCredentialsViaSMS(ctx context.Context, phoneNumber, email, password string) error {
+	// ctx parameter is required by interface but not used in this implementation
 	// Construct message
 	message := fmt.Sprintf("اطلاعات ورود به سیستم گیت نت:\nایمیل: %s\nرمز عبور: %s", email, password)
 
@@ -434,6 +435,7 @@ func (s *SMSService) SendUserCredentials(ctx context.Context, mobile, email, pas
 
 // sendUserCredentialsViaSMS sends user credentials using regular SMS (fallback method)
 func (s *SMSService) sendUserCredentialsViaSMS(ctx context.Context, phoneNumber, email, password string) error {
+	// ctx parameter is required by interface but not used in this implementation
 	// Construct message
 	message := fmt.Sprintf("اطلاعات ورود به سیستم:\nایمیل: %s\nرمز عبور: %s", email, password)
 
@@ -470,9 +472,9 @@ func (s *SMSService) sendUserCredentialsViaSMS(ctx context.Context, phoneNumber,
 func (s *SMSService) handleKavenegarError(err error) error {
 	switch e := err.(type) {
 	case *kavenegar.APIError:
-		return fmt.Errorf("Kavenegar API error: %s (Status: %d)", e.Error(), e.Status)
+		return fmt.Errorf("kavenegar API error: %s (Status: %d)", e.Error(), e.Status)
 	case *kavenegar.HTTPError:
-		return fmt.Errorf("Kavenegar HTTP error: %s", e.Error())
+		return fmt.Errorf("kavenegar HTTP error: %s", e.Error())
 	default:
 		return fmt.Errorf("SMS service error: %w", err)
 	}

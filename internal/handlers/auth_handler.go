@@ -191,9 +191,22 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		user = userModel.ToResponse()
 	}
 
+	// Get user permissions
+	permissions, err := h.authService.GetUserPermissionsByID(claims.UserID, claims.UserType)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve user permissions",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Profile retrieved successfully",
-		"data":    user,
+		"data": models.ProfileResponse{
+			User:        user,
+			UserType:    claims.UserType,
+			Permissions: permissions,
+		},
 	})
 }
 

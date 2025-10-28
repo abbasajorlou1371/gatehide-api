@@ -125,12 +125,109 @@ func (m *MockUserRepository) UpdateEmail(id int, email string) error {
 	return args.Error(0)
 }
 
+// MockPermissionRepository is a mock implementation of PermissionRepositoryInterface
+type MockPermissionRepository struct {
+	mock.Mock
+}
+
+func (m *MockPermissionRepository) GetPermissionsByRole(roleType string) ([]models.Permission, error) {
+	args := m.Called(roleType)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Permission), args.Error(1)
+}
+
+func (m *MockPermissionRepository) HasPermission(roleType, resource, action string) (bool, error) {
+	args := m.Called(roleType, resource, action)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockPermissionRepository) GetRoleWithPermissions(roleType string) (*models.RoleWithPermissions, error) {
+	args := m.Called(roleType)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.RoleWithPermissions), args.Error(1)
+}
+
+func (m *MockPermissionRepository) GetRoleByName(roleName string) (*models.Role, error) {
+	args := m.Called(roleName)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Role), args.Error(1)
+}
+
+func (m *MockPermissionRepository) GetAllRoles() ([]models.Role, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Role), args.Error(1)
+}
+
+func (m *MockPermissionRepository) GetAllPermissions() ([]models.Permission, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Permission), args.Error(1)
+}
+
+func (m *MockPermissionRepository) AssignRoleToUser(userID int, userType string, roleName string) error {
+	args := m.Called(userID, userType, roleName)
+	return args.Error(0)
+}
+
+func (m *MockPermissionRepository) GetUserRoles(userID int, userType string) ([]models.Role, error) {
+	args := m.Called(userID, userType)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Role), args.Error(1)
+}
+
+func (m *MockPermissionRepository) GetUserPermissions(userID int, userType string) ([]models.Permission, error) {
+	args := m.Called(userID, userType)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Permission), args.Error(1)
+}
+
+func (m *MockPermissionRepository) RemoveRoleFromUser(userID int, userType string, roleName string) error {
+	args := m.Called(userID, userType, roleName)
+	return args.Error(0)
+}
+
+func (m *MockPermissionRepository) HasUserRole(userID int, userType string, roleName string) (bool, error) {
+	args := m.Called(userID, userType, roleName)
+	return args.Bool(0), args.Error(1)
+}
+
+// MockSMSService is a mock implementation of SMSService
+type MockSMSService struct {
+	mock.Mock
+}
+
+func (m *MockSMSService) SendSMS(ctx context.Context, sms *models.SMSNotification) error {
+	args := m.Called(ctx, sms)
+	return args.Error(0)
+}
+
+func (m *MockSMSService) SendUserCredentials(ctx context.Context, mobile, email, password string) error {
+	args := m.Called(ctx, mobile, email, password)
+	return args.Error(0)
+}
+
 func TestUserService_Create(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Success", func(t *testing.T) {
 		mockRepo := new(MockUserRepository)
-		userService := services.NewUserService(mockRepo, nil, nil)
+		mockPermissionRepo := new(MockPermissionRepository)
+		userService := services.NewUserService(mockRepo, mockPermissionRepo, nil, nil)
 
 		req := &models.UserCreateRequest{
 			Name:   "Test User",
@@ -144,6 +241,8 @@ func TestUserService_Create(t *testing.T) {
 		mockRepo.On("GetByMobile", req.Mobile).Return(nil, errors.New("user not found"))
 		// Mock Create to succeed
 		mockRepo.On("Create", mock.AnythingOfType("*models.User")).Return(nil)
+		// Mock AssignRoleToUser to succeed
+		mockPermissionRepo.On("AssignRoleToUser", mock.AnythingOfType("int"), "user", "user").Return(nil)
 
 		user, err := userService.Create(ctx, req, nil)
 
@@ -153,11 +252,13 @@ func TestUserService_Create(t *testing.T) {
 		assert.Equal(t, req.Email, user.Email)
 		assert.Equal(t, req.Mobile, user.Mobile)
 		mockRepo.AssertExpectations(t)
+		mockPermissionRepo.AssertExpectations(t)
 	})
 
 	t.Run("Email Already Exists", func(t *testing.T) {
 		mockRepo := new(MockUserRepository)
-		userService := services.NewUserService(mockRepo, nil, nil)
+		mockPermissionRepo := new(MockPermissionRepository)
+		userService := services.NewUserService(mockRepo, mockPermissionRepo, nil, nil)
 
 		req := &models.UserCreateRequest{
 			Name:   "Test User",
@@ -179,11 +280,13 @@ func TestUserService_Create(t *testing.T) {
 		assert.Nil(t, user)
 		assert.Contains(t, err.Error(), "email already exists")
 		mockRepo.AssertExpectations(t)
+		mockPermissionRepo.AssertExpectations(t)
 	})
 
 	t.Run("Mobile Already Exists", func(t *testing.T) {
 		mockRepo := new(MockUserRepository)
-		userService := services.NewUserService(mockRepo, nil, nil)
+		mockPermissionRepo := new(MockPermissionRepository)
+		userService := services.NewUserService(mockRepo, mockPermissionRepo, nil, nil)
 
 		req := &models.UserCreateRequest{
 			Name:   "Test User",
@@ -207,6 +310,7 @@ func TestUserService_Create(t *testing.T) {
 		assert.Nil(t, user)
 		assert.Contains(t, err.Error(), "mobile number already exists")
 		mockRepo.AssertExpectations(t)
+		mockPermissionRepo.AssertExpectations(t)
 	})
 }
 
@@ -215,7 +319,8 @@ func TestUserService_GetByID(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockRepo := new(MockUserRepository)
-		userService := services.NewUserService(mockRepo, nil, nil)
+		mockPermissionRepo := new(MockPermissionRepository)
+		userService := services.NewUserService(mockRepo, mockPermissionRepo, nil, nil)
 
 		expectedUser := &models.User{
 			ID:     1,
@@ -233,11 +338,13 @@ func TestUserService_GetByID(t *testing.T) {
 		assert.Equal(t, expectedUser.ID, user.ID)
 		assert.Equal(t, expectedUser.Name, user.Name)
 		mockRepo.AssertExpectations(t)
+		mockPermissionRepo.AssertExpectations(t)
 	})
 
 	t.Run("Not Found", func(t *testing.T) {
 		mockRepo := new(MockUserRepository)
-		userService := services.NewUserService(mockRepo, nil, nil)
+		mockPermissionRepo := new(MockPermissionRepository)
+		userService := services.NewUserService(mockRepo, mockPermissionRepo, nil, nil)
 
 		mockRepo.On("GetByID", 999).Return(nil, errors.New("user not found"))
 
@@ -246,6 +353,7 @@ func TestUserService_GetByID(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, user)
 		mockRepo.AssertExpectations(t)
+		mockPermissionRepo.AssertExpectations(t)
 	})
 }
 
@@ -254,7 +362,8 @@ func TestUserService_Update(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockRepo := new(MockUserRepository)
-		userService := services.NewUserService(mockRepo, nil, nil)
+		mockPermissionRepo := new(MockPermissionRepository)
+		userService := services.NewUserService(mockRepo, mockPermissionRepo, nil, nil)
 
 		existingUser := &models.User{
 			ID:     1,
@@ -286,11 +395,13 @@ func TestUserService_Update(t *testing.T) {
 		assert.NotNil(t, user)
 		assert.Equal(t, newName, user.Name)
 		mockRepo.AssertExpectations(t)
+		mockPermissionRepo.AssertExpectations(t)
 	})
 
 	t.Run("User Not Found", func(t *testing.T) {
 		mockRepo := new(MockUserRepository)
-		userService := services.NewUserService(mockRepo, nil, nil)
+		mockPermissionRepo := new(MockPermissionRepository)
+		userService := services.NewUserService(mockRepo, mockPermissionRepo, nil, nil)
 
 		newName := "New Name"
 		req := &models.UserUpdateRequest{
@@ -305,6 +416,7 @@ func TestUserService_Update(t *testing.T) {
 		assert.Nil(t, user)
 		assert.Contains(t, err.Error(), "not found")
 		mockRepo.AssertExpectations(t)
+		mockPermissionRepo.AssertExpectations(t)
 	})
 }
 
@@ -313,7 +425,8 @@ func TestUserService_Delete(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockRepo := new(MockUserRepository)
-		userService := services.NewUserService(mockRepo, nil, nil)
+		mockPermissionRepo := new(MockPermissionRepository)
+		userService := services.NewUserService(mockRepo, mockPermissionRepo, nil, nil)
 
 		existingUser := &models.User{
 			ID:   1,
@@ -327,11 +440,13 @@ func TestUserService_Delete(t *testing.T) {
 
 		assert.NoError(t, err)
 		mockRepo.AssertExpectations(t)
+		mockPermissionRepo.AssertExpectations(t)
 	})
 
 	t.Run("User Not Found", func(t *testing.T) {
 		mockRepo := new(MockUserRepository)
-		userService := services.NewUserService(mockRepo, nil, nil)
+		mockPermissionRepo := new(MockPermissionRepository)
+		userService := services.NewUserService(mockRepo, mockPermissionRepo, nil, nil)
 
 		mockRepo.On("GetByID", 999).Return(nil, errors.New("user not found"))
 
@@ -340,6 +455,7 @@ func TestUserService_Delete(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 		mockRepo.AssertExpectations(t)
+		mockPermissionRepo.AssertExpectations(t)
 	})
 }
 
@@ -348,7 +464,8 @@ func TestUserService_GetAll(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockRepo := new(MockUserRepository)
-		userService := services.NewUserService(mockRepo, nil, nil)
+		mockPermissionRepo := new(MockPermissionRepository)
+		userService := services.NewUserService(mockRepo, mockPermissionRepo, nil, nil)
 
 		expectedUsers := []models.User{
 			{ID: 1, Name: "User 1", Email: "user1@example.com"},
@@ -363,11 +480,13 @@ func TestUserService_GetAll(t *testing.T) {
 		assert.NotNil(t, users)
 		assert.Len(t, users, 2)
 		mockRepo.AssertExpectations(t)
+		mockPermissionRepo.AssertExpectations(t)
 	})
 
 	t.Run("Repository Error", func(t *testing.T) {
 		mockRepo := new(MockUserRepository)
-		userService := services.NewUserService(mockRepo, nil, nil)
+		mockPermissionRepo := new(MockPermissionRepository)
+		userService := services.NewUserService(mockRepo, mockPermissionRepo, nil, nil)
 
 		mockRepo.On("GetAll").Return(nil, errors.New("database error"))
 
@@ -376,6 +495,7 @@ func TestUserService_GetAll(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, users)
 		mockRepo.AssertExpectations(t)
+		mockPermissionRepo.AssertExpectations(t)
 	})
 }
 
@@ -384,7 +504,8 @@ func TestUserService_Search(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockRepo := new(MockUserRepository)
-		userService := services.NewUserService(mockRepo, nil, nil)
+		mockPermissionRepo := new(MockPermissionRepository)
+		userService := services.NewUserService(mockRepo, mockPermissionRepo, nil, nil)
 
 		searchReq := &models.UserSearchRequest{
 			Query:    "test",
@@ -414,5 +535,6 @@ func TestUserService_Search(t *testing.T) {
 		assert.NotNil(t, result)
 		assert.Len(t, result.Data, 1)
 		mockRepo.AssertExpectations(t)
+		mockPermissionRepo.AssertExpectations(t)
 	})
 }
