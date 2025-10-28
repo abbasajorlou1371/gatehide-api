@@ -44,7 +44,7 @@ func main() {
 	log.Printf("🏥 Health check available at: http://localhost:%s/health", cfg.Server.Port)
 
 	// Start server
-	address := fmt.Sprintf(":%s", cfg.Server.Port)
+	address := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
 	if err := router.Run(address); err != nil {
 		log.Fatalf("❌ Failed to start server: %v", err)
 	}
